@@ -1,0 +1,89 @@
+[package]
+name = "wtf-engine"
+version = "0.1.0"
+edition = "2021"
+description = "DAG-based durable workflow execution engine"
+readme = "README.md"
+license = "MIT"
+authors = ["Your Name <you@example.com>"]
+repository = "https://github.com/yourname/wtf-engine"
+keywords = ["workflow", "durable", "execution", "dag", "orchestration"]
+categories = ["command-line-utilities", "development-tools", "embedded-database"]
+
+[workspace]
+members = [
+    "crates/wtf-common",
+    "crates/wtf-core",
+    "crates/wtf-storage",
+    "crates/wtf-actor",
+    "crates/wtf-worker",
+    "crates/wtf-api",
+    "crates/wtf-cli",
+    "crates/wtf-frontend",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+async-trait = "0.1"
+
+# Actor framework
+ractor = "0.15"
+
+# Embedded database
+sled = "0.34"
+
+# Graph
+petgraph = "0.6"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rmp-serde = "1"
+serde_yaml = "0.9"
+
+# Web framework
+axum = "0.7"
+tower = "0.4"
+tower-http = "0.5"
+reqwest = { version = "0.11", features = ["json"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+ulid = "1"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tap = "1"
+futures-lite = "2"
+bytes = "1"
+
+# UI (Dioxus)
+dioxus = { version = "0.7", features = ["web", "router"] }
+dioxus-router = "0.7"
+
+# Error handling
+nom = "7"
+strum = { version = "0.24", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

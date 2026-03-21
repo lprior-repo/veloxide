@@ -1,0 +1,33 @@
+[package]
+name = "wtf-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+wtf-common = { path = "../wtf-common" }
+wtf-core = { path = "../wtf-core" }
+wtf-storage = { path = "../wtf-storage" }
+wtf-actor = { path = "../wtf-actor" }
+wtf-worker = { path = "../wtf-worker" }
+
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+reqwest = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
