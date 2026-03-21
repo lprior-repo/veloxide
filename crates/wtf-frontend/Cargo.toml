@@ -22,6 +22,7 @@ chrono = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tap = { workspace = true }
+petgraph = { workspace = true }
 
 # Async
 futures = { workspace = true }
