@@ -28,10 +28,11 @@ use std::time::Instant;
 
 use async_nats::jetstream::Context;
 use bytes::Bytes;
+use tokio::time::Duration;
 use wtf_common::WtfError;
 
-use crate::activity::{complete_activity, fail_activity, retries_exhausted};
-use crate::queue::{ActivityTask, WorkQueueConsumer};
+use crate::activity::{calculate_backoff_delay, complete_activity, fail_activity, retries_exhausted};
+use crate::queue::{enqueue_activity, ActivityTask, WorkQueueConsumer};
 
 /// Boxed async activity handler: takes a task and returns `Ok(result_bytes)` or `Err(message)`.
 type ActivityHandler = Arc<
@@ -185,6 +186,30 @@ impl Worker {
             }
             Err(error) => {
                 let exhausted = retries_exhausted(task.attempt, task.retry_policy.max_attempts);
+
+                if !exhausted {
+                    if let Some(delay_ms) =
+                        calculate_backoff_delay(task.attempt, &task.retry_policy)
+                    {
+                        tracing::info!(
+                            activity_id = %task.activity_id,
+                            attempt = %task.attempt,
+                            delay_ms,
+                            "activity failed, scheduling retry after backoff"
+                        );
+                        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                        let retry_task = ActivityTask {
+                            activity_id: task.activity_id.clone(),
+                            activity_type: task.activity_type.clone(),
+                            payload: task.payload.clone(),
+                            namespace: task.namespace.clone(),
+                            instance_id: task.instance_id.clone(),
+                            attempt: task.attempt + 1,
+                            retry_policy: task.retry_policy.clone(),
+                        };
+                        let _ = enqueue_activity(&self.js, &retry_task).await;
+                    }
+                }
 
                 let append_result = fail_activity(
                     &self.js,

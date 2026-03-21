@@ -119,9 +119,34 @@ pub fn retries_exhausted(attempt: u32, max_attempts: u32) -> bool {
     attempt >= max_attempts
 }
 
+/// Calculate exponential backoff delay in milliseconds.
+///
+/// delay = min(initial_interval_ms * (backoff_coefficient ^ (attempt - 1)), max_interval_ms)
+///
+/// Returns `None` if the calculated delay would exceed u64::MAX or if attempt is 0.
+/// Attempt is 1-based (first attempt = 1).
+#[must_use]
+pub fn calculate_backoff_delay(attempt: u32, retry_policy: &wtf_common::RetryPolicy) -> Option<u64> {
+    if attempt == 0 {
+        return None;
+    }
+
+    let exponent = (attempt - 1) as f64;
+    let multiplier = retry_policy.backoff_coefficient.powf(exponent);
+    let delay_f = (retry_policy.initial_interval_ms as f64) * multiplier;
+
+    if delay_f > u64::MAX as f64 {
+        return Some(retry_policy.max_interval_ms);
+    }
+
+    let delay = delay_f as u64;
+    Some(delay.min(retry_policy.max_interval_ms))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wtf_common::RetryPolicy;
 
     // complete_activity / fail_activity require a live NATS server.
     // The write-ahead sequence is covered by integration tests (wtf-2bbn).
@@ -163,5 +188,71 @@ mod tests {
     #[test]
     fn retries_not_exhausted_at_zero_attempts_when_max_is_three() {
         assert!(!retries_exhausted(0, 3));
+    }
+
+    #[test]
+    fn calculate_backoff_delay_first_attempt() {
+        let policy = RetryPolicy::default();
+        let delay = calculate_backoff_delay(1, &policy);
+        assert_eq!(delay, Some(1000));
+    }
+
+    #[test]
+    fn calculate_backoff_delay_second_attempt() {
+        let policy = RetryPolicy::default();
+        let delay = calculate_backoff_delay(2, &policy);
+        assert_eq!(delay, Some(2000));
+    }
+
+    #[test]
+    fn calculate_backoff_delay_third_attempt() {
+        let policy = RetryPolicy::default();
+        let delay = calculate_backoff_delay(3, &policy);
+        assert_eq!(delay, Some(4000));
+    }
+
+    #[test]
+    fn calculate_backoff_delay_caps_at_max() {
+        let policy = RetryPolicy {
+            initial_interval_ms: 1000,
+            backoff_coefficient: 2.0,
+            max_interval_ms: 10000,
+            ..Default::default()
+        };
+        let delay = calculate_backoff_delay(10, &policy);
+        assert_eq!(delay, Some(10000));
+    }
+
+    #[test]
+    fn calculate_backoff_delay_zero_attempt_returns_none() {
+        let policy = RetryPolicy::default();
+        let delay = calculate_backoff_delay(0, &policy);
+        assert_eq!(delay, None);
+    }
+
+    #[test]
+    fn calculate_backoff_delay_linear_coefficient_one() {
+        let policy = RetryPolicy {
+            initial_interval_ms: 500,
+            backoff_coefficient: 1.0,
+            max_interval_ms: 60000,
+            ..Default::default()
+        };
+        assert_eq!(calculate_backoff_delay(1, &policy), Some(500));
+        assert_eq!(calculate_backoff_delay(2, &policy), Some(500));
+        assert_eq!(calculate_backoff_delay(3, &policy), Some(500));
+    }
+
+    #[test]
+    fn calculate_backoff_delay_fractional_coefficient() {
+        let policy = RetryPolicy {
+            initial_interval_ms: 1000,
+            backoff_coefficient: 1.5,
+            max_interval_ms: 60000,
+            ..Default::default()
+        };
+        assert_eq!(calculate_backoff_delay(1, &policy), Some(1000));
+        assert_eq!(calculate_backoff_delay(2, &policy), Some(1500));
+        assert_eq!(calculate_backoff_delay(3, &policy), Some(2250));
     }
 }
