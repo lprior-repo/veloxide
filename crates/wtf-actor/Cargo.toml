@@ -10,7 +10,10 @@ wtf-core = { path = "../wtf-core" }
 wtf-storage = { path = "../wtf-storage" }
 
 # Actor framework
-ractor = { workspace = true }
+ractor = { workspace = true, features = ["async-trait"] }
+
+# Embedded database
+sled = { workspace = true }
 
 # Async
 tokio = { workspace = true }
@@ -26,3 +29,7 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
+ulid = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
