@@ -27,7 +27,8 @@ use wtf_storage::NatsClient;
 
 use crate::instance::WorkflowInstance;
 use crate::messages::{
-    InstanceArguments, InstanceMsg, OrchestratorMsg, StartError, TerminateError,
+    InstanceArguments, InstanceMetadata, InstanceMsg, OrchestratorMsg,
+    StartError, TerminateError,
 };
 
 /// Timeout for synchronous calls to WorkflowInstance actors.
@@ -205,15 +206,7 @@ impl Actor for MasterOrchestrator {
             }
 
             OrchestratorMsg::HeartbeatExpired { instance_id } => {
-                if !state.active.contains_key(&instance_id) {
-                    tracing::warn!(
-                        instance_id = %instance_id,
-                        "HeartbeatExpired for unknown instance — may need recovery (wtf-r4aa)"
-                    );
-                }
-                // If the instance IS in the registry the actor is still alive on this node —
-                // the heartbeat TTL was not refreshed in time; the actor will write the next
-                // heartbeat on its own. Recovery logic is in bead wtf-r4aa.
+                handle_heartbeat_expired(myself.clone(), state, instance_id).await;
             }
         }
 
@@ -292,9 +285,9 @@ async fn handle_start_workflow(
 
     // 3. Build InstanceArguments.
     let args = InstanceArguments {
-        namespace,
+        namespace: namespace.clone(),
         instance_id: instance_id.clone(),
-        workflow_type,
+        workflow_type: workflow_type.clone(),
         paradigm,
         input,
         engine_node_id: state.config.engine_node_id.clone(),
@@ -305,6 +298,8 @@ async fn handle_start_workflow(
     // 4. Spawn the WorkflowInstance as a supervised child of this orchestrator.
     let actor_name = format!("wf-{}", instance_id.as_str());
     let supervisor_cell: ActorCell = myself.clone().into();
+    let paradigm_for_metadata = args.paradigm;
+    let namespace_for_metadata = args.namespace.clone();
 
     match WorkflowInstance::spawn_linked(Some(actor_name), WorkflowInstance, args, supervisor_cell)
         .await
@@ -315,7 +310,35 @@ async fn handle_start_workflow(
         }
         Ok((actor_ref, _handle)) => {
             tracing::info!(instance_id = %instance_id, "WorkflowInstance spawned");
-            // 5. Register the actor ref in the active registry.
+
+            // 5. Write instance metadata to `wtf-instances` KV for crash recovery.
+            if let Some(nats) = &state.config.nats {
+                let js = nats.jetstream();
+                if let Ok(instances_kv) = js.get_key_value(wtf_storage::bucket_names::INSTANCES).await {
+                    let metadata = InstanceMetadata {
+                        namespace: namespace_for_metadata,
+                        instance_id: instance_id.clone(),
+                        workflow_type,
+                        paradigm: paradigm_for_metadata,
+                        engine_node_id: state.config.engine_node_id.clone(),
+                    };
+                    if let Ok(json) = serde_json::to_vec(&metadata) {
+                        let key = wtf_storage::instance_key(
+                            metadata.namespace.as_str(),
+                            &metadata.instance_id,
+                        );
+                        if let Err(e) = instances_kv.put(&key, json.into()).await {
+                            tracing::warn!(
+                                instance_id = %instance_id,
+                                error = %e,
+                                "failed to write instance metadata to KV — recovery may be affected"
+                            );
+                        }
+                    }
+                }
+            }
+
+            // 6. Register the actor ref in the active registry.
             state.register(instance_id.clone(), actor_ref);
             let _ = reply.send(Ok(instance_id));
         }
@@ -411,6 +434,128 @@ async fn handle_list_active(
         }
     }
     snapshots
+}
+
+// ── Heartbeat-driven crash recovery (bead wtf-07zs) ───────────────────────────
+
+/// Handle a `HeartbeatExpired` event from the NATS KV watcher.
+///
+/// If the instance is still in the local registry, the actor is alive and the
+/// heartbeat will be refreshed on the next tick — no action needed.
+///
+/// If the instance is NOT in the registry, we look up its metadata from the
+/// `wtf-instances` KV bucket and respawn a new WorkflowInstance. The new
+/// instance will replay from the last snapshot automatically in `pre_start`.
+async fn handle_heartbeat_expired(
+    myself: ActorRef<OrchestratorMsg>,
+    state: &mut OrchestratorState,
+    instance_id: InstanceId,
+) {
+    // Q4: If instance IS in registry, it's alive — no spurious recovery.
+    if state.active.contains_key(&instance_id) {
+        tracing::debug!(
+            instance_id = %instance_id,
+            "HeartbeatExpired but instance is alive — ignoring"
+        );
+        return;
+    }
+
+    let nats = match &state.config.nats {
+        Some(n) => n,
+        None => {
+            tracing::error!(instance_id = %instance_id, "HeartbeatExpired but no NATS client — cannot recover");
+            return;
+        }
+    };
+
+    let js = nats.jetstream();
+
+    // Q5: Look up instance metadata from `wtf-instances` KV.
+    let instances_kv = match js.get_key_value(wtf_storage::bucket_names::INSTANCES).await {
+        Ok(kv) => kv,
+        Err(e) => {
+            tracing::error!(
+                instance_id = %instance_id,
+                error = %e,
+                "HeartbeatExpired — failed to open wtf-instances KV"
+            );
+            return;
+        }
+    };
+
+    let key = wtf_storage::instance_key(
+        "", // namespace is part of the instance_id in this key format
+        &instance_id,
+    );
+
+    let metadata_raw = match instances_kv.get(&key).await {
+        Ok(Some(raw)) => raw,
+        Ok(None) => {
+            tracing::warn!(
+                instance_id = %instance_id,
+                "HeartbeatExpired but no metadata in wtf-instances KV — skipping recovery"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::error!(
+                instance_id = %instance_id,
+                error = %e,
+                "HeartbeatExpired — failed to get metadata from wtf-instances KV"
+            );
+            return;
+        }
+    };
+
+    let metadata: InstanceMetadata = match serde_json::from_slice(&metadata_raw) {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::error!(
+                instance_id = %instance_id,
+                error = %e,
+                "HeartbeatExpired — failed to deserialize instance metadata"
+            );
+            return;
+        }
+    };
+
+    tracing::info!(
+        instance_id = %instance_id,
+        namespace = %metadata.namespace,
+        workflow_type = %metadata.workflow_type,
+        paradigm = ?metadata.paradigm,
+        "HeartbeatExpired — triggering crash recovery"
+    );
+
+    // Build InstanceArguments for recovery spawn.
+    let args = InstanceArguments {
+        namespace: metadata.namespace.clone(),
+        instance_id: instance_id.clone(),
+        workflow_type: metadata.workflow_type.clone(),
+        paradigm: metadata.paradigm,
+        input: bytes::Bytes::new(), // Input was consumed at original start; empty for recovery
+        engine_node_id: state.config.engine_node_id.clone(),
+        nats: state.config.nats.clone(),
+        procedural_workflow: None, // TODO: Lookup from registry (wtf-lrko)
+    };
+
+    // Spawn the recovered instance as a supervised child.
+    let actor_name = format!("wf-recovered-{}", instance_id.as_str());
+    let supervisor_cell: ActorCell = myself.clone().into();
+
+    match WorkflowInstance::spawn_linked(Some(actor_name), WorkflowInstance, args, supervisor_cell).await {
+        Err(e) => {
+            tracing::error!(
+                instance_id = %instance_id,
+                error = %e,
+                "HeartbeatExpired — recovery spawn failed"
+            );
+        }
+        Ok((actor_ref, _handle)) => {
+            tracing::info!(instance_id = %instance_id, "Recovery instance spawned");
+            state.register(instance_id, actor_ref);
+        }
+    }
 }
 
 #[cfg(test)]

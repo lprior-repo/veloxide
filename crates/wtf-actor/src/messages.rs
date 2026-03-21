@@ -254,6 +254,32 @@ pub enum TerminateError {
     Failed(String),
 }
 
+/// Error during heartbeat-driven crash recovery.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum RecoveryError {
+    #[error("instance metadata not found in KV: {0}")]
+    InstanceNotFound(InstanceId),
+    #[error("failed to create replay consumer: {0}")]
+    ReplayFailed(String),
+    #[error("failed to spawn actor: {0}")]
+    SpawnFailed(String),
+    #[error("NATS client unavailable for recovery")]
+    NoNatsClient,
+}
+
+/// Metadata stored in `wtf-instances` KV for each running instance.
+///
+/// Used by crash recovery to respawn an instance without needing the original
+/// `InstanceArguments` (which may have been lost if the actor process crashed).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstanceMetadata {
+    pub namespace: NamespaceId,
+    pub instance_id: InstanceId,
+    pub workflow_type: String,
+    pub paradigm: WorkflowParadigm,
+    pub engine_node_id: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
