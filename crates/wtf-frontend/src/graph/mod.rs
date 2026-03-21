@@ -46,7 +46,10 @@ pub use execution_state::{
     can_transition, try_transition, CompletedState, ExecutionState, FailedState, IdleState,
     InvalidTransition, QueuedState, RunningState, SkippedState, StateTransition, TerminalState,
 };
-pub use validation::{validate_workflow, ValidationIssue, ValidationResult, ValidationSeverity};
+pub use validation::{
+    validate_workflow, validate_workflow_for_paradigm, Paradigm, ValidationIssue, ValidationResult,
+    ValidationSeverity,
+};
 pub use workflow_node::{
     ConditionResult, HttpMethod, RunConfig, UnknownHttpMethodError, WorkflowNode,
 };

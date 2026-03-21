@@ -125,6 +125,223 @@ pub fn validate_workflow(workflow: &Workflow) -> ValidationResult {
     ValidationResult { issues }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Paradigm {
+    Fsm,
+    Dag,
+    Procedural,
+}
+
+#[must_use]
+pub fn validate_workflow_for_paradigm(workflow: &Workflow, paradigm: Paradigm) -> ValidationResult {
+    let mut issues = Vec::new();
+
+    if workflow.nodes.is_empty() {
+        issues.push(ValidationIssue::error("Workflow has no nodes".to_string()));
+        return ValidationResult { issues };
+    }
+
+    match paradigm {
+        Paradigm::Fsm => validate_fsm_constraints(workflow, &mut issues),
+        Paradigm::Dag => validate_dag_constraints(workflow, &mut issues),
+        Paradigm::Procedural => validate_procedural_constraints(workflow, &mut issues),
+    }
+
+    ValidationResult { issues }
+}
+
+fn validate_fsm_constraints(workflow: &Workflow, issues: &mut Vec<ValidationIssue>) {
+    let entry_ids: HashSet<NodeId> = workflow
+        .nodes
+        .iter()
+        .filter(|n| n.category == NodeCategory::Entry)
+        .map(|n| n.id)
+        .collect();
+
+    if entry_ids.is_empty() {
+        return;
+    }
+
+    let mut reachable: HashSet<NodeId> = HashSet::new();
+    let mut stack: Vec<NodeId> = entry_ids.iter().copied().collect();
+
+    while let Some(current) = stack.pop() {
+        if reachable.insert(current) {
+            for conn in workflow.connections.iter().filter(|c| c.source == current) {
+                if !reachable.contains(&conn.target) {
+                    stack.push(conn.target);
+                }
+            }
+        }
+    }
+
+    for node in &workflow.nodes {
+        if !reachable.contains(&node.id) && node.category != NodeCategory::Entry {
+            issues.push(ValidationIssue::warning_for_node(
+                format!(
+                    "State '{}' is not reachable from any entry point",
+                    node.name
+                ),
+                node.id,
+            ));
+        }
+    }
+
+    let has_terminal = workflow
+        .nodes
+        .iter()
+        .any(|n| workflow.connections.iter().all(|c| c.source != n.id));
+
+    if !has_terminal {
+        issues.push(ValidationIssue::error(
+            "FSM must have at least one terminal state".to_string(),
+        ));
+    }
+
+    for node in &workflow.nodes {
+        if node.category == NodeCategory::Entry {
+            continue;
+        }
+
+        let has_incoming = workflow.connections.iter().any(|c| c.target == node.id);
+        let has_outgoing = workflow.connections.iter().any(|c| c.source == node.id);
+
+        if !has_incoming && !has_outgoing && workflow.nodes.len() > 1 {
+            issues.push(ValidationIssue::warning_for_node(
+                format!("Node '{}' is isolated", node.name),
+                node.id,
+            ));
+        }
+    }
+}
+
+fn validate_dag_constraints(workflow: &Workflow, issues: &mut Vec<ValidationIssue>) {
+    use petgraph::algo::is_cyclic_directed;
+    use petgraph::graph::NodeIndex;
+    use petgraph::Graph;
+
+    let mut graph = Graph::<NodeId, ()>::new();
+    let mut index_map: std::collections::HashMap<NodeId, NodeIndex> =
+        std::collections::HashMap::new();
+
+    for node in &workflow.nodes {
+        let idx = graph.add_node(node.id);
+        index_map.insert(node.id, idx);
+    }
+
+    for conn in &workflow.connections {
+        if let (Some(&src), Some(&tgt)) = (index_map.get(&conn.source), index_map.get(&conn.target))
+        {
+            graph.add_edge(src, tgt, ());
+        }
+    }
+
+    if is_cyclic_directed(&graph) {
+        issues.push(ValidationIssue::error("DAG contains a cycle".to_string()));
+        return;
+    }
+
+    let source_nodes: Vec<NodeId> = workflow
+        .nodes
+        .iter()
+        .filter(|n| !workflow.connections.iter().any(|c| c.target == n.id))
+        .map(|n| n.id)
+        .collect();
+
+    if source_nodes.len() != 1 {
+        issues.push(ValidationIssue::error(
+            "DAG must have exactly one source node".to_string(),
+        ));
+    }
+
+    let sink_nodes: Vec<NodeId> = workflow
+        .nodes
+        .iter()
+        .filter(|n| !workflow.connections.iter().any(|c| c.source == n.id))
+        .map(|n| n.id)
+        .collect();
+
+    if sink_nodes.is_empty() {
+        issues.push(ValidationIssue::error(
+            "DAG must have at least one sink node".to_string(),
+        ));
+    }
+}
+
+fn validate_procedural_constraints(workflow: &Workflow, issues: &mut Vec<ValidationIssue>) {
+    let entry_ids: HashSet<NodeId> = workflow
+        .nodes
+        .iter()
+        .filter(|n| n.category == NodeCategory::Entry)
+        .map(|n| n.id)
+        .collect();
+
+    if entry_ids.len() != 1 {
+        issues.push(ValidationIssue::error(
+            "Procedural workflow must have exactly one entry point".to_string(),
+        ));
+        return;
+    }
+
+    for node in &workflow.nodes {
+        let outgoing_count = workflow
+            .connections
+            .iter()
+            .filter(|c| c.source == node.id)
+            .count();
+
+        if outgoing_count > 1 {
+            issues.push(ValidationIssue::error_for_node(
+                format!(
+                    "Node '{}' has {} outgoing connections (branching not allowed in procedural)",
+                    node.name, outgoing_count
+                ),
+                node.id,
+            ));
+        }
+    }
+
+    if workflow.nodes.len() > 1 {
+        let entry_id = entry_ids.iter().next().unwrap();
+
+        let mut current: Vec<NodeId> = vec![*entry_id];
+        let mut visited: HashSet<NodeId> = HashSet::new();
+        let mut terminal_found = false;
+
+        while let Some(node_id) = current.pop() {
+            if visited.contains(&node_id) {
+                continue;
+            }
+            visited.insert(node_id);
+
+            let outgoing: Vec<NodeId> = workflow
+                .connections
+                .iter()
+                .filter(|c| c.source == node_id)
+                .map(|c| c.target)
+                .collect();
+
+            if outgoing.is_empty() {
+                terminal_found = true;
+            } else if outgoing.len() == 1 {
+                current.push(outgoing[0]);
+            }
+        }
+
+        if !terminal_found {
+            issues.push(ValidationIssue::error(
+                "Procedural workflow must have exactly one linear path".to_string(),
+            ));
+        }
+
+        if visited.len() != workflow.nodes.len() {
+            issues.push(ValidationIssue::error(
+                "Procedural workflow must have exactly one linear path".to_string(),
+            ));
+        }
+    }
+}
+
 fn validate_entry_points(workflow: &Workflow, issues: &mut Vec<ValidationIssue>) {
     if !workflow
         .nodes
@@ -1094,6 +1311,341 @@ mod tests {
             };
             assert_eq!(result.error_count(), 2);
             assert_eq!(result.warning_count(), 2);
+        }
+    }
+
+    mod paradigm_validation {
+        use super::*;
+        use crate::graph::{Connection, PortName};
+
+        mod fsm_validation {
+            use super::*;
+
+            #[test]
+            fn given_valid_fsm_single_node_then_no_errors() {
+                let workflow = Workflow::default();
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Fsm);
+                assert!(result.is_valid());
+            }
+
+            #[test]
+            fn given_fsm_unreachable_state_returns_warning() {
+                let mut workflow = Workflow::new();
+                let entry_id = workflow.add_node("http-handler", 0.0, 0.0);
+                let _ = workflow.add_node("run", 200.0, 0.0);
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Fsm);
+
+                assert!(result.has_warnings());
+                assert!(result
+                    .issues
+                    .iter()
+                    .any(|i| i.message.contains("not reachable")));
+            }
+
+            #[test]
+            fn given_fsm_linear_chain_returns_no_errors() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("http-handler", 0.0, 0.0);
+                let b = workflow.add_node("run", 200.0, 0.0);
+                let c = workflow.add_node("run", 400.0, 0.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    c,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Fsm);
+
+                assert!(result.is_valid());
+            }
+
+            #[test]
+            fn given_fsm_missing_terminal_returns_error() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("http-handler", 0.0, 0.0);
+                let b = workflow.add_node("run", 200.0, 0.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    a,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Fsm);
+
+                assert!(result.has_errors());
+                assert!(result.issues.iter().any(|i| i.message.contains("terminal")));
+            }
+
+            #[test]
+            fn given_fsm_isolated_node_returns_warning() {
+                let mut workflow = Workflow::new();
+                let _ = workflow.add_node("http-handler", 0.0, 0.0);
+                let isolated = workflow.add_node("run", 200.0, 0.0);
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Fsm);
+
+                assert!(result.has_warnings());
+                assert!(result.issues.iter().any(|i| {
+                    i.severity == ValidationSeverity::Warning
+                        && i.node_id == Some(isolated)
+                        && i.message.contains("isolated")
+                }));
+            }
+        }
+
+        mod dag_validation {
+            use super::*;
+
+            #[test]
+            fn given_valid_dag_tree_then_no_errors() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("dag-task", 0.0, 0.0);
+                let b = workflow.add_node("dag-task", 200.0, 0.0);
+                let c = workflow.add_node("dag-task", 200.0, 100.0);
+                let d = workflow.add_node("dag-task", 400.0, 50.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    a,
+                    c,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    d,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    c,
+                    d,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Dag);
+
+                assert!(result.is_valid());
+            }
+
+            #[test]
+            fn given_dag_cyclic_graph_returns_error() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("dag-task", 0.0, 0.0);
+                let b = workflow.add_node("dag-task", 200.0, 0.0);
+                let c = workflow.add_node("dag-task", 400.0, 0.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    c,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    c,
+                    a,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Dag);
+
+                assert!(result.has_errors());
+                assert!(result.issues.iter().any(|i| i.message.contains("cycle")));
+            }
+
+            #[test]
+            fn given_dag_multiple_sources_returns_error() {
+                let mut workflow = Workflow::new();
+                let _ = workflow.add_node("dag-task", 0.0, 0.0);
+                let _ = workflow.add_node("dag-task", 0.0, 100.0);
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Dag);
+
+                assert!(result.has_errors());
+                assert!(result
+                    .issues
+                    .iter()
+                    .any(|i| i.message.contains("exactly one source")));
+            }
+
+            #[test]
+            fn given_dag_missing_sink_returns_error() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("dag-task", 0.0, 0.0);
+                let b = workflow.add_node("dag-task", 200.0, 0.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    a,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Dag);
+
+                assert!(result.has_errors());
+                assert!(result
+                    .issues
+                    .iter()
+                    .any(|i| i.message.contains("at least one sink")));
+            }
+
+            #[test]
+            fn given_dag_single_node_valid() {
+                let workflow = Workflow::new();
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Dag);
+                assert!(result.is_valid());
+            }
+        }
+
+        mod procedural_validation {
+            use super::*;
+
+            #[test]
+            fn given_valid_procedural_linear_chain_returns_no_errors() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("http-handler", 0.0, 0.0);
+                let b = workflow.add_node("run", 200.0, 0.0);
+                let c = workflow.add_node("run", 400.0, 0.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    c,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Procedural);
+
+                assert!(result.is_valid());
+            }
+
+            #[test]
+            fn given_procedural_branching_returns_error() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("http-handler", 0.0, 0.0);
+                let b = workflow.add_node("run", 200.0, 0.0);
+                let c = workflow.add_node("run", 200.0, 100.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    a,
+                    c,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Procedural);
+
+                assert!(result.has_errors());
+                assert!(result.issues.iter().any(|i| {
+                    i.severity == ValidationSeverity::Error
+                        && i.node_id == Some(a)
+                        && i.message.contains("branching")
+                }));
+            }
+
+            #[test]
+            fn given_procedural_multiple_paths_returns_error() {
+                let mut workflow = Workflow::new();
+                let a = workflow.add_node("http-handler", 0.0, 0.0);
+                let b = workflow.add_node("run", 200.0, 0.0);
+                let c = workflow.add_node("run", 200.0, 100.0);
+                let d = workflow.add_node("run", 400.0, 50.0);
+
+                workflow.add_connection(
+                    a,
+                    b,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    a,
+                    c,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    b,
+                    d,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+                workflow.add_connection(
+                    c,
+                    d,
+                    &PortName("main".to_string()),
+                    &PortName("main".to_string()),
+                );
+
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Procedural);
+
+                assert!(result.has_errors());
+            }
+
+            #[test]
+            fn given_procedural_single_node_valid() {
+                let workflow = Workflow::new();
+                let result = validate_workflow_for_paradigm(&workflow, Paradigm::Procedural);
+                assert!(result.is_valid());
+            }
+        }
+
+        #[test]
+        fn given_empty_workflow_all_paradigms_returns_error() {
+            let workflow = Workflow::default();
+            for paradigm in [Paradigm::Fsm, Paradigm::Dag, Paradigm::Procedural] {
+                let result = validate_workflow_for_paradigm(&workflow, paradigm);
+                assert!(result.has_errors());
+                assert!(result.issues.iter().any(|i| i.message.contains("no nodes")));
+            }
         }
     }
 }

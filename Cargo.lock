@@ -5287,6 +5287,7 @@ dependencies = [
  "dioxus-router",
  "futures",
  "gloo-timers",
+ "petgraph",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
