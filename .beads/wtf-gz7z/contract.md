@@ -69,6 +69,7 @@ On parse failure:
 2. **No False Positives**: `ctx.now()` and non-`.now()` time code MUST NOT produce diagnostics
 3. **Deterministic Output**: Same source always produces same diagnostics (no randomness in linting)
 4. **Error Isolation**: Parse errors do not crash the linter; they return as `LintError::ParseError`
+5. **Macro Scope**: The linter inspects raw syntax trees and does NOT expand macros. Code inside macro invocations (e.g., `vec![Utc::now()]`) is NOT currently linted. This is a known limitation documented in this contract.
 
 ---
 

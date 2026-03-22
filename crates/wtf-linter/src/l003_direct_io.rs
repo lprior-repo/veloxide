@@ -11,6 +11,10 @@ use syn::{spanned::Spanned, Expr, ExprAwait, ExprCall, Path};
 const SUGGESTION: &str =
     "direct async I/O in workflow function — wrap in ctx.activity(\"name\", input) instead";
 
+/// Lints workflow code for direct async I/O calls.
+///
+/// # Errors
+/// Returns `LintError::ParseError` if the source cannot be parsed.
 pub fn lint_workflow_code(source: &str) -> Result<Vec<Diagnostic>, LintError> {
     let syntax_tree = syn::parse_file(source).map_err(|e| LintError::ParseError(e.to_string()))?;
     let mut visitor = L003Visitor::new();

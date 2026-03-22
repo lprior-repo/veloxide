@@ -111,6 +111,7 @@ impl L004Visitor {
         }
     }
 
+    #[allow(clippy::self_only_used_in_recursion)]
     fn is_ctx_receiver(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Path(path_expr) => Self::is_ctx_path(&path_expr.path),
@@ -140,6 +141,7 @@ impl L004Visitor {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_expr(&mut self, expr: &Expr) {
         if self.in_workflow_fn {
             if let Expr::MethodCall(method_call) = expr {

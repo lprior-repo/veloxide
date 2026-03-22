@@ -7,6 +7,10 @@
 use crate::diagnostic::{Diagnostic, LintCode, LintError};
 use syn::{Block, Expr, Item, ItemImpl, Stmt};
 
+/// Lints workflow code for disallowed thread operations.
+///
+/// # Errors
+/// Returns `LintError::ParseError` if the source cannot be parsed.
 pub fn lint_workflow_code(source: &str) -> Result<Vec<Diagnostic>, LintError> {
     let syntax_tree = syn::parse_file(source).map_err(|e| LintError::ParseError(e.to_string()))?;
     let mut collector = L006Visitor::new();
@@ -50,6 +54,7 @@ impl L006Visitor {
         self.in_workflow_fn = was_in_wf;
     }
 
+    #[allow(clippy::too_many_lines)]
     fn visit_expr(&mut self, expr: &Expr) {
         if self.in_workflow_fn {
             if let Expr::Call(call) = expr {

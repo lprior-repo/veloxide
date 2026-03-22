@@ -19,40 +19,56 @@ updated_at: 2026-03-22T00:00:00Z
 
 ## STATE 2: TEST PLAN REVIEW
 - [x] test-reviewer sub-agent ✅ COMPLETE
-- [x] STATUS: REJECTED — FLAWED
-- [x] test-defects.md updated (1 defect: Scenario 16 title/assertion contradiction)
-- **Defect**: Scenario 16 title says "NOT flagged" but Then expects 1 diagnostic — internal contradiction
-- **Note**: Code was fixed (method-call style now correct), but title/assertion contradiction remains
+- [x] STATUS: APPROVED ✅ (Round 3 - previous Scenario 16 defect fixed)
+- [x] No blocking defects — two non-blocking recommendations documented
 
 ## STATE 3: IMPLEMENTATION
-- [ ] functional-rust sub-agent
+- [x] functional-rust sub-agent ✅ COMPLETE
+- [x] implementation.md written (11KB)
+- [x] Verified: zero unwraps in core, Data→Calc→Actions, thiserror error handling
 
 ## STATE 4: MOON GATE
-- [ ] :quick
-- [ ] :test
-- [ ] :ci
-- [ ] :e2e
+- [x] :quick ✅ (cargo check)
+- [x] :test ✅ (46 tests pass)
+- [x] :clippy ✅ (zero warnings, -D enforced)
+- [x] Pre-existing clippy errors in visitor.rs/l004.rs fixed by functional-rust sub-agent
+- **Note**: No :ci or :e2e targets in this crate — linter is library-only
 
 ## STATE 4.5: QA EXECUTION
-- [ ] qa-enforcer sub-agent
+- [x] qa-enforcer sub-agent ✅ COMPLETE
+- [x] All checks PASS (12/12 unit tests, clippy, 5/5 integration)
+- [x] qa-report.md written
 
 ## STATE 4.6: QA REVIEW
-- [ ] Review qa-report.md
+- [x] Review qa-report.md ✅ PASS — all invariants verified
+- [x] No critical issues found
 
 ## STATE 5: ADVERSARIAL REVIEW (RED QUEEN)
-- [ ] red-queen sub-agent
+- [x] red-queen sub-agent ✅ COMPLETE
+- [x] 3 bugs found: macros bypass, deep paths not detected, bare Utc::now() not detected
+- [x] red-queen-report.md written
 
 ## STATE 5.5: BLACK HAT CODE REVIEW
-- [ ] black-hat-reviewer sub-agent
+- [x] black-hat-reviewer sub-agent ✅ COMPLETE
+- [x] STATUS: REJECTED — 3 contract gaps + 1 false claim in implementation.md
+- [x] defects.md written
 
 ## STATE 5.7: KANI MODEL CHECKING
-- [ ] kani run or formal justification
+- [x] kani-justification.md written ✅ (formal argument: stateless pure function, no state machines)
+- [x] No Kani run needed — contract is a pure transformation with no reachable panic states
 
 ## STATE 6: REPAIR LOOP (if needed)
-- [ ] functional-rust sub-agent (fixes)
+- [x] functional-rust sub-agent ✅ COMPLETE (fixes applied — retry 1/5)
+- [x] Defect 1 fixed: implementation.md false claim removed
+- [x] Defect 2 fixed: bare Utc::now() 2-segment detection added
+- [x] Defect 3 fixed: suffix matching for deep paths
+- [x] Defect 4 fixed: contract.md macro limitation documented
+- [x] Re-entered STATE 4 (Moon Gate) — GREEN ✅
 
 ## STATE 7: ARCHITECTURAL DRIFT
-- [ ] architectural-drift sub-agent
+- [x] architectural-drift sub-agent ✅ COMPLETE
+- [x] STATUS: REFACTORED — tests split to `tests/l001_time.rs`, main impl 141 lines
+- [x] All 106 tests pass ✅
 
 ## STATE 8: LANDING
 - [ ] bd close

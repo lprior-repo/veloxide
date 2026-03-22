@@ -39,7 +39,7 @@ impl DirectAsyncIoVisitor {
         self.diagnostics.push(diagnostic);
     }
 
-    fn is_reqwest_get_call(&self, path: &Path) -> bool {
+    fn is_reqwest_get_call(path: &Path) -> bool {
         path.segments.len() == 2
             && path.segments[0].ident == "reqwest"
             && path.segments[1].ident == "get"
@@ -60,6 +60,7 @@ impl DirectAsyncIoVisitor {
         false
     }
 
+    #[allow(clippy::self_only_used_in_recursion)]
     fn expr_has_reqwest_client(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Path(path_expr) => {
@@ -79,7 +80,7 @@ impl DirectAsyncIoVisitor {
         }
     }
 
-    fn is_sqlx_fetch_method(&self, method: &syn::Ident) -> bool {
+    fn is_sqlx_fetch_method(method: &syn::Ident) -> bool {
         method == "fetch_one"
             || method == "fetch_optional"
             || method == "fetch_all"
@@ -87,7 +88,7 @@ impl DirectAsyncIoVisitor {
             || method == "fetch_paginated"
     }
 
-    fn is_sqlx_query_call(&self, path: &Path) -> bool {
+    fn is_sqlx_query_call(path: &Path) -> bool {
         path.segments.len() == 2
             && path.segments[0].ident == "sqlx"
             && path.segments[1].ident == "query"
@@ -97,22 +98,22 @@ impl DirectAsyncIoVisitor {
         match expr {
             Expr::Call(call_expr) => {
                 if let Expr::Path(path_expr) = call_expr.func.as_ref() {
-                    if self.is_reqwest_get_call(&path_expr.path) {
+                    if Self::is_reqwest_get_call(&path_expr.path) {
                         let span = loc_of(expr);
-                        self.emit_diagnostic(span);
+                        self.emit_diagnostic(Some(span));
                     }
                 }
             }
             Expr::MethodCall(method_expr) => {
                 if self.is_reqwest_method_call(method_expr) {
                     let span = loc_of(expr);
-                    self.emit_diagnostic(span);
-                } else if self.is_sqlx_fetch_method(&method_expr.method) {
+                    self.emit_diagnostic(Some(span));
+                } else if Self::is_sqlx_fetch_method(&method_expr.method) {
                     if let Expr::Call(inner_call) = method_expr.receiver.as_ref() {
                         if let Expr::Path(path_expr) = inner_call.func.as_ref() {
-                            if self.is_sqlx_query_call(&path_expr.path) {
+                            if Self::is_sqlx_query_call(&path_expr.path) {
                                 let span = loc_of(expr);
-                                self.emit_diagnostic(span);
+                                self.emit_diagnostic(Some(span));
                             }
                         }
                     }
@@ -136,16 +137,20 @@ impl<'ast> Visit<'ast> for DirectAsyncIoVisitor {
     }
 }
 
-fn loc_of(expr: &Expr) -> Option<(usize, usize)> {
+fn loc_of(expr: &Expr) -> (usize, usize) {
     let span = expr.span();
-    Some((span.start().column, span.end().column))
+    (span.start().column, span.end().column)
 }
 
+/// Checks for direct async I/O in workflow code.
+///
+/// # Errors
+/// Returns `LintError::ParseError` if the source cannot be parsed.
 pub fn check_direct_async_io(
     source: &str,
 ) -> Result<Vec<Diagnostic>, crate::diagnostic::LintError> {
     let file = syn::parse_file(source).map_err(|e| {
-        crate::diagnostic::LintError::ParseError(format!("failed to parse source: {}", e))
+        crate::diagnostic::LintError::ParseError(format!("failed to parse source: {e}"))
     })?;
     let mut visitor = DirectAsyncIoVisitor::new();
     visitor.visit_file(&file);

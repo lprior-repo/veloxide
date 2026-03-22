@@ -11,6 +11,10 @@ use syn::{spanned::Spanned, Expr, Path};
 const SUGGESTION: &str =
     "use ctx.now() instead — returns a logged timestamp that is consistent on replay";
 
+/// Lints workflow code for non-deterministic time calls.
+///
+/// # Errors
+/// Returns `LintError::ParseError` if the source cannot be parsed.
 pub fn lint_workflow_code(source: &str) -> Result<Vec<Diagnostic>, LintError> {
     let syntax_tree = syn::parse_file(source).map_err(|e| LintError::ParseError(e.to_string()))?;
     let mut visitor = L001Visitor::new();
@@ -47,27 +51,41 @@ impl L001Visitor {
         if segments.is_empty() {
             return false;
         }
-        let last_seg = &segments[segments.len() - 1];
+        let len = segments.len();
+        let last_seg = &segments[len - 1];
         if last_seg.ident != "now" {
             return false;
         }
-        if segments.len() == 3 && segments[0].ident == "chrono" && segments[1].ident == "Utc" {
-            return true;
-        }
-        if segments.len() == 3 && segments[0].ident == "chrono" && segments[1].ident == "Local" {
-            return true;
-        }
-        if segments.len() == 4
-            && segments[0].ident == "std"
-            && segments[1].ident == "time"
-            && (segments[2].ident == "SystemTime" || segments[2].ident == "Instant")
+        // 2-segment bare paths: Utc::now, Local::now, SystemTime::now, Instant::now
+        // (without chrono:: or std::time:: prefix)
+        if len == 2
+            && (segments[0].ident == "Utc"
+                || segments[0].ident == "Local"
+                || segments[0].ident == "SystemTime"
+                || segments[0].ident == "Instant")
         {
             return true;
         }
-        if segments.len() == 4
-            && segments[0].ident == "tokio"
-            && segments[1].ident == "time"
-            && segments[2].ident == "Instant"
+        // Suffix match for chrono::*::now (last 3 segments must be chrono::Utc::now or chrono::Local::now)
+        if len >= 3
+            && segments[len - 3].ident == "chrono"
+            && (segments[len - 2].ident == "Utc" || segments[len - 2].ident == "Local")
+        {
+            return true;
+        }
+        // Suffix match for std::time::*::now (last 4 segments must be std::time::SystemTime::now or std::time::Instant::now)
+        if len >= 4
+            && segments[len - 4].ident == "std"
+            && segments[len - 3].ident == "time"
+            && (segments[len - 2].ident == "SystemTime" || segments[len - 2].ident == "Instant")
+        {
+            return true;
+        }
+        // Suffix match for tokio::time::Instant::now (last 4 segments)
+        if len >= 4
+            && segments[len - 4].ident == "tokio"
+            && segments[len - 3].ident == "time"
+            && segments[len - 2].ident == "Instant"
         {
             return true;
         }
@@ -79,16 +97,12 @@ impl L001Visitor {
             if let Expr::Path(path_expr) = expr.receiver.as_ref() {
                 let path = &path_expr.path;
                 return path.segments.len() == 2
-                    && ((path.segments[0].ident == "std"
-                        && path.segments[1].ident == "SystemTime")
-                        || (path.segments[0].ident == "std"
-                            && path.segments[1].ident == "Instant")
-                        || (path.segments[0].ident == "chrono"
-                            && path.segments[1].ident == "Utc")
-                        || (path.segments[0].ident == "chrono"
-                            && path.segments[1].ident == "Local")
-                        || (path.segments[0].ident == "tokio"
-                            && path.segments[1].ident == "time"));
+                    && (path.segments[0].ident == "std"
+                        && (path.segments[1].ident == "SystemTime"
+                            || path.segments[1].ident == "Instant"))
+                    || (path.segments[0].ident == "chrono"
+                        && (path.segments[1].ident == "Utc" || path.segments[1].ident == "Local"))
+                    || (path.segments[0].ident == "tokio" && path.segments[1].ident == "time");
             }
         }
         false
@@ -124,163 +138,4 @@ impl<'ast> syn::visit::Visit<'ast> for L001Visitor {
 
 fn loc_of(expr: &Expr) -> (usize, usize) {
     (expr.span().start().column, expr.span().end().column)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn check(source: &str) -> Result<Vec<Diagnostic>, LintError> {
-        lint_workflow_code(source)
-    }
-
-    #[test]
-    fn test_emits_no_diagnostic_for_code_without_time_calls() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = ctx.now();
-    Ok(())
-}
-"#;
-        let result = check(source);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_emits_diagnostic_when_chrono_utc_now_found() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = chrono::Utc::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].code, LintCode::L001);
-    }
-
-    #[test]
-    fn test_emits_diagnostic_when_chrono_local_now_found() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = chrono::Local::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].code, LintCode::L001);
-    }
-
-    #[test]
-    fn test_emits_diagnostic_when_system_time_now_found() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = std::time::SystemTime::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].code, LintCode::L001);
-    }
-
-    #[test]
-    fn test_emits_diagnostic_when_instant_now_found() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = std::time::Instant::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].code, LintCode::L001);
-    }
-
-    #[test]
-    fn test_emits_diagnostic_when_tokio_instant_now_found() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = tokio::time::Instant::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].code, LintCode::L001);
-    }
-
-    #[test]
-    fn test_emits_no_diagnostic_when_ctx_now_found() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = ctx.now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_emits_multiple_diagnostics_for_multiple_time_calls() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let a = chrono::Utc::now();
-    let b = std::time::SystemTime::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result.len(), 2);
-        assert!(result.iter().all(|d| d.code == LintCode::L001));
-    }
-
-    #[test]
-    fn test_diagnostic_code_is_wtf_l001() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = chrono::Utc::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert_eq!(result[0].code.as_str(), "WTF-L001");
-    }
-
-    #[test]
-    fn test_diagnostic_message_contains_non_deterministic() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = chrono::Utc::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert!(result[0].message.contains("non-deterministic"));
-    }
-
-    #[test]
-    fn test_diagnostic_suggestion_contains_ctx_now() {
-        let source = r#"
-async fn workflow(ctx: &Ctx) -> Result<(), Error> {
-    let t = chrono::Utc::now();
-    Ok(())
-}
-"#;
-        let result = check(source).expect("should parse");
-        assert!(result[0]
-            .suggestion
-            .as_ref()
-            .is_some_and(|s| s.contains("ctx.now()")));
-    }
-
-    #[test]
-    fn test_returns_parse_error_for_invalid_rust() {
-        let source = "async fn workflow { // missing parentheses";
-        let result = check(source);
-        assert!(result.is_err());
-    }
 }

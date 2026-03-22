@@ -9,6 +9,10 @@ use crate::{l001_time, l003_direct_io, l004, l005, l006, rules};
 
 /// Rule abstraction used by the visitor-based linter engine.
 pub trait VisitRule {
+    /// Lints the given source code.
+    ///
+    /// # Errors
+    /// Returns `LintError::ParseError` if the source cannot be parsed.
     fn lint(&self, source: &str) -> Result<Vec<Diagnostic>, LintError>;
 }
 
@@ -45,6 +49,10 @@ impl Linter {
         self.add_rule(RuleFn { f: rule });
     }
 
+    /// Lints the given source code.
+    ///
+    /// # Errors
+    /// Returns `LintError::ParseError` if the source cannot be parsed.
     pub fn lint_source(&self, source: &str) -> Result<Vec<Diagnostic>, LintError> {
         self.rules.iter().try_fold(Vec::new(), |acc, rule| {
             rule.lint(source).map(|diags| {
@@ -55,6 +63,10 @@ impl Linter {
         })
     }
 
+    /// Lints the file at the given path.
+    ///
+    /// # Errors
+    /// Returns `LintError::ParseError` if the file cannot be read or parsed.
     pub fn lint_file(&self, path: &std::path::Path) -> Result<Vec<Diagnostic>, LintError> {
         std::fs::read_to_string(path)
             .map_err(|e| LintError::ParseError(e.to_string()))

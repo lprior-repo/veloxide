@@ -1,83 +1,115 @@
-# Test Defects Report: WTF-L001
+# Test Defects Report: WTF-L001 Non-Deterministic Time Detection
 
-## Metadata
-- **bead_id**: wtf-gz7z
-- **review_phase**: test-plan-review (STATE 2 re-review round 2)
-- **reviewer**: test-reviewer
-- **status**: REJECTED — FLAWED
-- **updated_at**: 2026-03-22T17:00:00Z
+**Bead ID:** wtf-gz7z  
+**Review Date:** 2026-03-22  
+**Status:** APPROVED
 
 ---
 
-## Defect Summary
+## Summary
 
-| # | Severity | Category | Description |
-|---|----------|----------|-------------|
-| 1 | LOW | Test Assertion Contradiction | Scenario 16 title says "NOT flagged" but Then expects diagnostic |
+The martin-fowler-tests.md passes all critical evaluation criteria:
+- ✅ GWT structure correct in all 20 scenarios
+- ✅ No title/assertion contradictions (previous Sc.16 defect fixed)
+- ✅ Tests verify contract (public API), not implementation details
+- ✅ All contract-specified patterns have test coverage
+- ✅ Edge cases covered (empty source, strings, unused vars, parse errors)
 
 ---
 
-## Defect 1: Scenario 16 Title/Assertion Contradiction
+## Minor Issues (Non-Blocking Recommendations)
 
-**Location**: martin-fowler-tests.md, Scenario 16 (lines 270-285)
+### Recommendation #1: Add Test for `chrono::Local::now()` Method-Call Style
 
-**Issue**: The test title says "NOT flagged (implementation gap)" but the Then assertion expects exactly 1 diagnostic.
+**Severity:** LOW  
+**Type:** Incomplete Coverage
 
-**Current title**:
+**Rationale:**
+- Contract Invariant #1: "Every non-deterministic `.now()` call in the source MUST produce exactly one diagnostic"
+- `Local::now()` in method-call style IS a non-deterministic `.now()` call
+- Contract explicitly specifies `chrono::Local::now()` in path style (must flag)
+- Contract does NOT explicitly specify `Local::now()` in method-call style
+- Test coverage exists for `Utc::now()` method-call style (Sc.17) but NOT for `Local::now()`
+
+**Recommended Test:**
+```rust
+### Scenario: chrono::Local in method-call style — emits diagnostic
+
+Given Rust source code using chrono::Local in method-call style
+```rust
+async fn workflow(ctx: &Ctx) -> Result<(), Error> {
+    let t = Local::now();
+    Ok(())
+}
 ```
-### Scenario 16: tokio::time::Instant as method call receiver — NOT flagged (implementation gap)
-```
 
-**Current Then assertion**:
-```
+When `lint_workflow_code(source)` is called
 Then the result is `Ok(vec![diagnostic])` with exactly 1 diagnostic
 ```
 
-**Problem**: 
-1. Title says "NOT flagged" suggesting no diagnostic expected
-2. But Then clause expects exactly 1 diagnostic
-3. This is an internal contradiction in the test specification
-
-**Contract alignment issue**:
-- The contract lists `tokio::time::Instant::now()` (path-style) and `Instant::now()` (method-call-style) as flagged patterns
-- The contract does NOT explicitly list `tokio::time::Instant.now()` (fully-qualified receiver + method-call-style) as a required pattern
-- If the implementation correctly flags `Instant::now()` but NOT `tokio::time::Instant.now()`, the test would fail — but the implementation would be correct per contract
-
-**Why this is a defect**:
-1. Internal contradiction between title and assertion
-2. Tests behavior beyond contract requirements
-3. If implementation doesn't flag `tokio::time::Instant.now()`, test fails but contract is satisfied
-
-**Fix required**: Either:
-- Remove Scenario 16 entirely (it tests beyond-contract behavior)
-- Or rename title to remove "NOT flagged" and clarify this tests implementation behavior beyond contract
+**Note:** This is a recommendation, not a requirement. The contract does not explicitly mandate method-call detection for `Local::now()`.
 
 ---
 
-## Verification of Previous Defects
+### Recommendation #2: Clarify Scenario 17 Contract Alignment
 
-| Defect | Previous Status | Current Status |
-|--------|----------------|----------------|
-| 1. Scenario 1 description bug | REJECTED | ✅ FIXED |
-| 2. Scenario 16 code/description mismatch | REJECTED | ⚠️ CODE FIXED but contradiction remains |
-| 3. Missing chrono method call tests | REJECTED | ✅ FIXED |
-| 4. Edge cases not documented | REJECTED | ✅ FIXED |
+**Severity:** LOW  
+**Type:** Contract Ambiguity
+
+**Issue:**
+- Scenario 17 tests `Utc::now()` in method-call style
+- Contract's Flagged Patterns table lists method-call style only for `SystemTime::now()` and `Instant::now()`
+- `Utc::now()` method-call style is NOT explicitly in contract
+
+**Options:**
+1. (A) Update contract to explicitly include `Utc::now()` in method-call style as a flagged pattern
+2. (B) Accept that Scenario 17 tests implementation behavior beyond contract (acceptable)
+
+**Current Status:** Not a defect — Scenario 17 is valid as implementation verification.
+
+---
+
+## Contract Coverage Verification
+
+| Pattern | Style | Contract | Test |
+|---------|-------|----------|------|
+| `std::time::SystemTime::now()` | path | MUST FLAG | ✅ Sc.2 |
+| `std::time::Instant::now()` | path | MUST FLAG | ✅ Sc.5 |
+| `chrono::Utc::now()` | path | MUST FLAG | ✅ Sc.3 |
+| `chrono::Local::now()` | path | MUST FLAG | ✅ Sc.4 |
+| `tokio::time::Instant::now()` | path | MUST FLAG | ✅ Sc.6 |
+| `SystemTime::now()` | method-call | MUST FLAG | ✅ Sc.13 |
+| `Instant::now()` | method-call | MUST FLAG | ✅ Sc.14 |
+| `tokio::time::Instant.now()` | method-call | NOT SPECIFIED | ✅ Sc.16 |
+| `Utc::now()` | method-call | NOT SPECIFIED | ✅ Sc.17 |
+| `Local::now()` | method-call | NOT SPECIFIED | ⚠️ Recommend adding |
+
+---
+
+## Verification of Previous Defects (Round 2 → Round 3)
+
+| Defect | Previous Report | Current Status |
+|--------|-----------------|----------------|
+| 1. Scenario 16 title contradiction ("NOT flagged") | REJECTED | ✅ FIXED — title now "flagged" |
+| 2. Missing chrono method-call tests | REJECTED | ⚠️ PARTIAL — Sc.17 added, Sc.18 missing |
+| 3. Edge cases not documented | REJECTED | ✅ FIXED |
+| 4. Contract-test alignment | REJECTED | ⚠️ AMBIGUOUS — Sc.17 tests beyond contract |
 
 ---
 
 ## Verdict
 
-**STATUS**: REJECTED — FLAWED
+**STATUS: APPROVED**
 
-**Remaining Issue**: Scenario 16 has a title/assertion contradiction. The title says "NOT flagged" but the assertion expects a diagnostic.
+The test plan passes all critical evaluation criteria. The two minor issues are recommendations rather than defects:
+1. Missing `Local::now()` method-call test — recommend adding for completeness
+2. Scenario 17 tests pattern not explicitly in contract — acceptable as implementation verification
 
-**Progress**: All 4 previous defects addressed in code. The remaining issue is a documentation contradiction in Scenario 16.
-
-**Required Action**:
-- Fix Scenario 16 title to match assertion, OR remove the scenario as it tests beyond-contract behavior
+No blocking defects remain.
 
 ---
 
-## Files Affected
+## Files Reviewed
 
+- `/home/lewis/src/wtf-engine/.beads/wtf-gz7z/contract.md`
 - `/home/lewis/src/wtf-engine/.beads/wtf-gz7z/martin-fowler-tests.md`
