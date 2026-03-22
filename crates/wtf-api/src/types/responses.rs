@@ -63,11 +63,19 @@ pub struct SignalResponse {
 /// Response containing workflow journal
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JournalResponse {
-    pub invocation_id: InvocationId,
+    pub invocation_id: String,
     pub entries: Vec<super::JournalEntry>,
 }
 
 impl JournalResponse {
+    #[must_use]
+    pub fn new(invocation_id: impl Into<String>, entries: Vec<super::JournalEntry>) -> Self {
+        Self {
+            invocation_id: invocation_id.into(),
+            entries,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), InvariantViolation> {
         let seqs = self.entries.iter().map(|e| e.seq);
         if !super::is_sorted(seqs) {
@@ -98,6 +106,13 @@ pub struct DiagnosticDto {
 /// Response to POST /api/v1/definitions/<type>.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefinitionResponse {
+    pub valid: bool,
+    pub diagnostics: Vec<DiagnosticDto>,
+}
+
+/// Response to POST /api/v1/workflows/validate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidateWorkflowResponse {
     pub valid: bool,
     pub diagnostics: Vec<DiagnosticDto>,
 }

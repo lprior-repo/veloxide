@@ -42,6 +42,14 @@ pub struct JournalEntry {
     pub status: Option<String>,
 }
 
+impl JournalEntry {
+    #[must_use]
+    pub fn with_timestamp(mut self, timestamp: Option<String>) -> Self {
+        self.timestamp = timestamp;
+        self
+    }
+}
+
 pub(crate) fn is_retryable_error(error: &str) -> bool {
     matches!(error, "at_capacity")
 }

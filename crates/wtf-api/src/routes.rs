@@ -21,6 +21,8 @@ pub fn create_routes(master: ActorRef<OrchestratorMsg>, kv: KvStores) -> Router 
             "/workflows/:id",
             get(handlers::get_workflow).delete(handlers::terminate_workflow),
         )
+        .route("/workflows/:id/journal", get(handlers::get_journal))
+        .route("/workflows/validate", post(handlers::validate_workflow))
         .route("/workflows/:id/signals", post(handlers::send_signal))
         .route("/workflows/:id/events", get(handlers::get_events))
         .route("/instances/:id/replay-to/:seq", get(handlers::replay_to))

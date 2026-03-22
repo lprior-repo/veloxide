@@ -2,12 +2,16 @@
 
 pub mod definitions;
 pub mod events;
+pub mod journal;
 pub mod signal;
+pub mod validate;
 pub mod workflow;
 
 pub use definitions::*;
 pub use events::*;
+pub use journal::*;
 pub use signal::*;
+pub use validate::*;
 pub use workflow::*;
 
 use std::time::Duration;
