@@ -5,9 +5,10 @@
 #![forbid(unsafe_code)]
 
 use crate::ui::panel_types::{
-    CollapseState, RunOutcome, PayloadShape,
     chevron_rotation_class, outcome_badge_style, outcome_icon_class, panel_height_class,
+    CollapseState, PayloadShape, RunOutcome,
 };
+use crate::ui::time_travel::{clamp_step_index, next_step, prev_step, DiffEntry, StateDiff};
 use dioxus::prelude::*;
 use oya_frontend::graph::{NodeId, RunRecord};
 use std::collections::{HashMap, HashSet};
@@ -91,13 +92,14 @@ fn truncate_preview(input: &str, max_chars: usize) -> String {
 fn is_failed_step_result(result: &serde_json::Value) -> bool {
     match result {
         serde_json::Value::Null => true,
-        serde_json::Value::Object(map) => map.get("error").is_some_and(|error_value| {
-            match error_value {
-                serde_json::Value::Null => false,
-                serde_json::Value::String(message) => !message.is_empty(),
-                _ => true,
-            }
-        }),
+        serde_json::Value::Object(map) => {
+            map.get("error")
+                .is_some_and(|error_value| match error_value {
+                    serde_json::Value::Null => false,
+                    serde_json::Value::String(message) => !message.is_empty(),
+                    _ => true,
+                })
+        }
         _ => false,
     }
 }
@@ -119,8 +121,7 @@ fn derive_step_counts(run: &RunRecord) -> (usize, usize) {
 mod tests {
     use super::{
         derive_step_counts, format_elapsed, format_run_duration, format_run_status,
-        run_status_badge_class, status_badge_classes, truncate_id, truncate_preview,
-        RunOutcome,
+        run_status_badge_class, status_badge_classes, truncate_id, truncate_preview, RunOutcome,
     };
     use oya_frontend::graph::{NodeId, RunRecord};
     use std::collections::HashMap;
@@ -341,6 +342,125 @@ fn FrozenModeBanner(
 }
 
 #[component]
+fn StepNavigation(
+    current_step: usize,
+    max_steps: usize,
+    on_prev: EventHandler<()>,
+    on_next: EventHandler<()>,
+) -> Element {
+    let can_go_prev = current_step > 0;
+    let can_go_next = current_step < max_steps.saturating_sub(1);
+
+    rsx! {
+        div { class: "flex items-center gap-1",
+            button {
+                class: if can_go_prev {
+                    "px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                } else {
+                    "px-2 py-1 rounded border border-slate-300 bg-white text-slate-400 cursor-not-allowed"
+                },
+                disabled: !can_go_prev,
+                onclick: move |_| { on_prev.call(()); },
+                crate::ui::icons::ChevronLeftIcon { class: "h-3 w-3" }
+            }
+            span { class: "text-[11px] text-slate-600 px-2",
+                "{current_step + 1} / {max_steps}"
+            }
+            button {
+                class: if can_go_next {
+                    "px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                } else {
+                    "px-2 py-1 rounded border border-slate-300 bg-white text-slate-400 cursor-not-allowed"
+                },
+                disabled: !can_go_next,
+                onclick: move |_| { on_next.call(()); },
+                crate::ui::icons::ChevronRightIcon { class: "h-3 w-3" }
+            }
+        }
+    }
+}
+
+#[component]
+fn StateDiffPanel(diff: StateDiff) -> Element {
+    if diff.is_empty() {
+        return rsx! {
+            div { class: "text-[11px] text-slate-500 italic px-3 py-2", "No changes" }
+        };
+    }
+
+    rsx! {
+        div { class: "px-3 py-2 text-[11px] font-mono",
+            for entry in diff.entries.iter() {
+                { match entry {
+                    DiffEntry::Added { key, value } => {
+                        rsx! {
+                            div { class: "flex gap-2",
+                                span { class: "text-emerald-600", "+" }
+                                span { class: "text-slate-600", "{key}:" }
+                                span { class: "text-emerald-700", "{value}" }
+                            }
+                        }
+                    }
+                    DiffEntry::Removed { key } => {
+                        rsx! {
+                            div { class: "flex gap-2",
+                                span { class: "text-red-600", "-" }
+                                span { class: "text-slate-600", "{key}" }
+                            }
+                        }
+                    }
+                    DiffEntry::Changed { key, old, new } => {
+                        rsx! {
+                            div { class: "flex flex-col gap-1",
+                                div { class: "flex gap-2",
+                                    span { class: "text-red-600", "-" }
+                                    span { class: "text-slate-600", "{key}:" }
+                                    span { class: "text-red-700", "{old}" }
+                                }
+                                div { class: "flex gap-2",
+                                    span { class: "text-emerald-600", "+" }
+                                    span { class: "text-slate-600", "{key}:" }
+                                    span { class: "text-emerald-700", "{new}" }
+                                }
+                            }
+                        }
+                    }
+                }}
+            }
+        }
+    }
+}
+
+#[component]
+fn JournalViewer(
+    nodes_by_id: ReadSignal<HashMap<NodeId, oya_frontend::graph::Node>>,
+    step_index: usize,
+    results: &HashMap<NodeId, serde_json::Value>,
+) -> Element {
+    let ordered: Vec<(NodeId, &serde_json::Value)> = results.iter().collect::<Vec<_>>();
+
+    let Some((node_id, result)) = ordered.get(step_index) else {
+        return rsx! { div { class: "text-[11px] text-slate-500 px-3 py-2", "No step at this index" } };
+    };
+
+    let node_name = nodes_by_id
+        .read()
+        .get(node_id)
+        .map_or_else(|| "Unknown".to_string(), |n| n.name.clone());
+
+    let result_str = serde_json::to_string(result).unwrap_or_else(|_| "{}".to_string());
+
+    rsx! {
+        div { class: "px-3 py-2",
+            div { class: "text-[11px] font-medium text-slate-700 mb-1", "{node_name}" }
+            div { class: "text-[10px] font-mono text-slate-500 bg-slate-100 rounded p-2 overflow-auto max-h-32",
+                "{result_str}"
+            }
+        }
+    }
+}
+
+#[component]
 pub fn ExecutionHistoryPanel(
     history: Memo<Vec<RunRecord>>,
     nodes_by_id: ReadSignal<HashMap<NodeId, oya_frontend::graph::Node>>,
@@ -350,8 +470,7 @@ pub fn ExecutionHistoryPanel(
     on_run_select: EventHandler<uuid::Uuid>,
     on_exit_frozen: EventHandler<()>,
 ) -> Element {
-    let mut expanded_runs: Signal<HashSet<uuid::Uuid>> =
-        use_signal(HashSet::new);
+    let mut expanded_runs: Signal<HashSet<uuid::Uuid>> = use_signal(HashSet::new);
     let history_len = history.read().len();
     let collapse_state = CollapseState::from_bool(*collapsed.read());
     let height_class = panel_height_class(collapse_state);

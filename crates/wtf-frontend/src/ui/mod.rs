@@ -23,6 +23,7 @@ pub mod prototype_palette;
 pub mod run_status_bar;
 pub mod selected_node_panel;
 pub mod sidebar;
+pub mod time_travel;
 pub mod toolbar;
 pub mod validation_panel;
 
@@ -49,5 +50,9 @@ pub use prototype_palette::PrototypePalette;
 pub use run_status_bar::RunStatusBar;
 pub use selected_node_panel::SelectedNodePanel;
 pub use sidebar::NodeSidebar;
+pub use time_travel::{
+    clamp_step_index, next_step, prev_step, validate_step_index, DiffEntry, OrderedStep,
+    StateDiff, StepIndex, TimeTravelError,
+};
 pub use toolbar::FlowToolbar;
 pub use validation_panel::ValidationPanel;

@@ -139,6 +139,14 @@ pub enum WorkflowEvent {
         retries_exhausted: bool,
     },
 
+    /// A heartbeat sent by a long-running activity to report progress.
+    ActivityHeartbeat {
+        /// Matches the `activity_id` from `ActivityDispatched`.
+        activity_id: String,
+        /// Human-readable progress update (max 1KB).
+        progress: String,
+    },
+
     // ── Timer lifecycle ───────────────────────────────────────────────────────
     /// A timer was scheduled to fire at a future time.
     TimerScheduled {

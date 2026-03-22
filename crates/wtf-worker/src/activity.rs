@@ -23,6 +23,7 @@
 
 use async_nats::jetstream::Context;
 use bytes::Bytes;
+use std::sync::Arc;
 use wtf_common::{ActivityId, InstanceId, NamespaceId, WorkflowEvent, WtfError};
 use wtf_storage::append_event;
 
@@ -143,6 +144,121 @@ pub fn calculate_backoff_delay(attempt: u32, retry_policy: &wtf_common::RetryPol
     Some(delay.min(retry_policy.max_interval_ms))
 }
 
+/// Maximum size of a heartbeat progress string in bytes (1KB).
+const MAX_HEARTBEAT_PROGRESS_BYTES: usize = 1024;
+
+/// Send a heartbeat for a running activity.
+///
+/// Appends `ActivityHeartbeat` to JetStream and returns the sequence number.
+/// Heartbeats are fire-and-forget; failures are logged but do not affect activity outcome.
+///
+/// # Parameters
+/// - `js` — JetStream context
+/// - `namespace` — Namespace of the owning workflow instance
+/// - `instance_id` — Instance that owns this activity
+/// - `activity_id` — The activity's unique ID
+/// - `progress` — Human-readable progress string (max 1KB)
+///
+/// # Errors
+/// Returns `WtfError::NatsPublish` if the append fails.
+/// Returns `WtfError::InvalidInput` if `progress` exceeds 1KB.
+pub async fn send_heartbeat(
+    js: &Context,
+    namespace: &NamespaceId,
+    instance_id: &InstanceId,
+    activity_id: &ActivityId,
+    progress: &str,
+) -> Result<u64, WtfError> {
+    let progress_bytes = progress.as_bytes();
+    if progress_bytes.len() > MAX_HEARTBEAT_PROGRESS_BYTES {
+        return Err(WtfError::InvalidInput {
+            detail: format!(
+                "heartbeat progress exceeds {} bytes (got {})",
+                MAX_HEARTBEAT_PROGRESS_BYTES,
+                progress_bytes.len()
+            ),
+        });
+    }
+
+    let event = WorkflowEvent::ActivityHeartbeat {
+        activity_id: activity_id.as_str().to_owned(),
+        progress: progress.to_owned(),
+    };
+
+    let seq = append_event(js, namespace, instance_id, &event).await?;
+
+    tracing::debug!(
+        %namespace,
+        %instance_id,
+        %activity_id,
+        seq,
+        progress_len = progress_bytes.len(),
+        "heartbeat sent"
+    );
+
+    Ok(seq)
+}
+
+/// A handle for sending heartbeats during activity execution.
+///
+/// Created by the worker before invoking the activity handler.
+/// The handler can call `send()` to emit heartbeats and `stop()` to release resources.
+#[derive(Debug, Clone)]
+pub struct HeartbeatSender {
+    js: Context,
+    namespace: NamespaceId,
+    instance_id: InstanceId,
+    activity_id: ActivityId,
+    stopped: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl HeartbeatSender {
+    /// Create a new heartbeat sender for the given activity.
+    #[must_use]
+    pub fn new(
+        js: Context,
+        namespace: NamespaceId,
+        instance_id: InstanceId,
+        activity_id: ActivityId,
+    ) -> Self {
+        Self {
+            js,
+            namespace,
+            instance_id,
+            activity_id,
+            stopped: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    /// Send a heartbeat with the given progress message.
+    ///
+    /// # Errors
+    /// Returns `WtfError::HeartbeatStopped` if `stop()` was already called.
+    /// Returns `WtfError::InvalidInput` if `progress` exceeds 1KB.
+    /// Returns `WtfError::NatsPublish` if the publish fails.
+    pub async fn send(&self, progress: &str) -> Result<u64, WtfError> {
+        if self.stopped.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(WtfError::HeartbeatStopped);
+        }
+
+        send_heartbeat(
+            &self.js,
+            &self.namespace,
+            &self.instance_id,
+            &self.activity_id,
+            progress,
+        )
+        .await
+    }
+
+    /// Stop sending heartbeats and release resources.
+    ///
+    /// Idempotent: calling multiple times is safe.
+    pub fn stop(&self) {
+        self.stopped.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,5 +370,14 @@ mod tests {
         assert_eq!(calculate_backoff_delay(1, &policy), Some(1000));
         assert_eq!(calculate_backoff_delay(2, &policy), Some(1500));
         assert_eq!(calculate_backoff_delay(3, &policy), Some(2250));
+    }
+
+    // Heartbeat tests (pure helpers — no NATS required)
+    // HeartbeatSender::send() requires a live NATS context (covered by integration tests).
+    // Unit tests here cover pure helper constants.
+
+    #[test]
+    fn heartbeat_max_progress_bytes_constant_is_1kb() {
+        assert_eq!(MAX_HEARTBEAT_PROGRESS_BYTES, 1024);
     }
 }

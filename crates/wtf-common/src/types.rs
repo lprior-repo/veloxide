@@ -226,6 +226,14 @@ pub enum WtfError {
     /// Workflow name is empty or contains illegal characters.
     #[error("invalid workflow name: {name:?}")]
     InvalidWorkflowName { name: String },
+
+    /// Input validation failed (e.g., oversized progress string).
+    #[error("invalid input: {detail}")]
+    InvalidInput { detail: String },
+
+    /// Attempted to use a heartbeat sender after it was stopped.
+    #[error("heartbeat sender stopped")]
+    HeartbeatStopped,
 }
 
 impl WtfError {

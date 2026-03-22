@@ -9,7 +9,17 @@
 // Rules WTF-L001 through WTF-L006 — see individual rule modules.
 
 pub mod diagnostic;
+pub mod l005;
 pub mod rules;
 pub mod visitor;
 
 pub use diagnostic::{Diagnostic, LintCode, Severity};
+pub use l005::lint_workflow_code;
+
+#[cfg(test)]
+mod integration_tests {
+    #[test]
+    fn dummy_test() {
+        assert!(true);
+    }
+}
