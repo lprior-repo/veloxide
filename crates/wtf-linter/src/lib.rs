@@ -13,3 +13,4 @@ pub mod rules;
 pub mod visitor;
 
 pub use diagnostic::{Diagnostic, LintCode, Severity};
+pub use rules::check_random_in_workflow;

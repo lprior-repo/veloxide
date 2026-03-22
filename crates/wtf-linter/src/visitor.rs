@@ -3,5 +3,5 @@
 #![deny(clippy::panic)]
 #![forbid(unsafe_code)]
 
-// Placeholder — the syn Visit trait implementations live in the rule modules.
-// This module will re-export the combined visitor once rules are implemented.
+// Re-exports from rules module
+pub use crate::rules::check_random_in_workflow;
