@@ -23,19 +23,20 @@ use async_nats::jetstream::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+use wtf_common::storage::{ReplayBatch, ReplayedEvent, ReplayStream};
 use wtf_common::{InstanceId, NamespaceId, WorkflowEvent, WtfError};
 
 use crate::journal::build_subject;
 
-/// A single decoded event from the replay stream.
-#[derive(Debug, Clone)]
-pub struct ReplayedEvent {
-    /// JetStream sequence number of this event.
-    pub seq: u64,
-    /// The decoded workflow event.
-    pub event: WorkflowEvent,
-    /// JetStream message timestamp.
-    pub timestamp: DateTime<Utc>,
+#[async_trait::async_trait]
+impl ReplayStream for ReplayConsumer {
+    async fn next_event(&mut self) -> Result<ReplayBatch, WtfError> {
+        self.next_event_internal().await
+    }
+
+    async fn next_live_event(&mut self) -> Result<ReplayedEvent, WtfError> {
+        self.next_live_event_internal().await
+    }
 }
 
 /// Configuration for a replay consumer.
@@ -63,16 +64,6 @@ impl Default for ReplayConfig {
     }
 }
 
-/// A single fetched batch from the replay consumer.
-#[derive(Debug)]
-pub enum ReplayBatch {
-    /// One decoded event from the log.
-    Event(ReplayedEvent),
-    /// No more messages within the tail timeout — replay is complete.
-    /// The actor should switch to Live Phase.
-    TailReached,
-}
-
 /// An active replay consumer. Call `next_event()` to retrieve events one at a time.
 pub struct ReplayConsumer {
     messages: async_nats::jetstream::consumer::push::Messages,
@@ -88,18 +79,10 @@ impl ReplayConsumer {
     ///
     /// # Errors
     /// Returns `WtfError::NatsPublish` if the NATS stream errors.
-    pub async fn next_event(&mut self) -> Result<ReplayBatch, WtfError> {
+    pub async fn next_event_internal(&mut self) -> Result<ReplayBatch, WtfError> {
         match tokio::time::timeout(self.tail_timeout, self.messages.next()).await {
             Ok(Some(Ok(msg))) => {
-                let info = msg
-                    .info()
-                    .map_err(|e| WtfError::nats_publish(format!("read msg info: {e}")))?;
-                let seq = info.stream_sequence;
-                let ts = info.published;
-                let timestamp = DateTime::<Utc>::from_timestamp(ts.unix_timestamp(), ts.nanosecond())
-                    .unwrap_or_default();
-                let event = decode_event(msg.payload.clone())?;
-                Ok(ReplayBatch::Event(ReplayedEvent { seq, event, timestamp }))
+                Ok(ReplayBatch::Event(self.decode_msg(msg)?))
             }
             Ok(Some(Err(e))) => Err(WtfError::nats_publish(format!("replay stream error: {e}"))),
             Ok(None) => {
@@ -108,6 +91,30 @@ impl ReplayConsumer {
             }
             Err(_timeout) => Ok(ReplayBatch::TailReached),
         }
+    }
+
+    /// Fetch the next event WITHOUT timeout (for Live Phase).
+    ///
+    /// # Errors
+    /// Returns `WtfError::NatsPublish` if the NATS stream errors or closes.
+    pub async fn next_live_event_internal(&mut self) -> Result<ReplayedEvent, WtfError> {
+        match self.messages.next().await {
+            Some(Ok(msg)) => self.decode_msg(msg),
+            Some(Err(e)) => Err(WtfError::nats_publish(format!("live stream error: {e}"))),
+            None => Err(WtfError::nats_publish("live stream closed unexpectedly")),
+        }
+    }
+
+    fn decode_msg(&self, msg: async_nats::jetstream::Message) -> Result<ReplayedEvent, WtfError> {
+        let info = msg
+            .info()
+            .map_err(|e| WtfError::nats_publish(format!("read msg info: {e}")))?;
+        let seq = info.stream_sequence;
+        let ts = info.published;
+        let timestamp = DateTime::<Utc>::from_timestamp(ts.unix_timestamp(), ts.nanosecond())
+            .unwrap_or_default();
+        let event = decode_event(msg.payload.clone())?;
+        Ok(ReplayedEvent { seq, event, timestamp })
     }
 }
 
@@ -133,10 +140,6 @@ pub async fn replay_events(
 
 /// Create an ephemeral ordered JetStream push consumer for replay.
 ///
-/// The consumer subscribes to the per-instance subject
-/// (`wtf.log.<namespace>.<instance_id>`) and delivers messages in order
-/// starting from `config.from_seq`.
-///
 /// # Errors
 /// Returns `WtfError::NatsPublish` if consumer creation fails.
 pub async fn create_replay_consumer(
@@ -146,45 +149,41 @@ pub async fn create_replay_consumer(
     config: &ReplayConfig,
 ) -> Result<ReplayConsumer, WtfError> {
     let subject = build_subject(namespace, instance_id);
+    let deliver_subject = generate_replay_inbox(instance_id);
+    let consumer_config = build_push_config(deliver_subject, subject, config.from_seq);
 
-    // Use a timestamped inbox to avoid collisions on concurrent replays.
+    let stream = js.get_stream(crate::provision::stream_names::EVENTS).await
+        .map_err(|e| WtfError::nats_publish(format!("get stream for replay: {e}")))?;
+
+    let consumer = stream.create_consumer(consumer_config).await
+        .map_err(|e| WtfError::nats_publish(format!("create replay consumer: {e}")))?;
+
+    Ok(ReplayConsumer {
+        messages: consumer.messages().await
+            .map_err(|e| WtfError::nats_publish(format!("replay consumer messages(): {e}")))?,
+        tail_timeout: config.tail_timeout,
+    })
+}
+
+fn generate_replay_inbox(instance_id: &InstanceId) -> String {
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
-        .unwrap_or_else(|_| 0u128);
+        .unwrap_or(0);
+    format!("_INBOX.wtf.replay.{}.{ts}", instance_id.as_str())
+}
 
-    let deliver_subject = format!("_INBOX.wtf.replay.{}.{ts}", instance_id.as_str());
-
-    let consumer_config = PushConfig {
-        deliver_subject: deliver_subject.clone(),
+fn build_push_config(deliver_subject: String, filter_subject: String, start_seq: u64) -> PushConfig {
+    PushConfig {
+        deliver_subject,
         deliver_policy: DeliverPolicy::ByStartSequence {
-            start_sequence: config.from_seq,
+            start_sequence: start_seq,
         },
         ack_policy: AckPolicy::None,
         replay_policy: ReplayPolicy::Instant,
-        filter_subject: subject,
+        filter_subject,
         ..Default::default()
-    };
-
-    let stream = js
-        .get_stream(crate::provision::stream_names::EVENTS)
-        .await
-        .map_err(|e| WtfError::nats_publish(format!("get stream for replay: {e}")))?;
-
-    let consumer = stream
-        .create_consumer(consumer_config)
-        .await
-        .map_err(|e| WtfError::nats_publish(format!("create replay consumer: {e}")))?;
-
-    let messages = consumer
-        .messages()
-        .await
-        .map_err(|e| WtfError::nats_publish(format!("replay consumer messages(): {e}")))?;
-
-    Ok(ReplayConsumer {
-        messages,
-        tail_timeout: config.tail_timeout,
-    })
+    }
 }
 
 fn decode_event(payload: Bytes) -> Result<WorkflowEvent, WtfError> {

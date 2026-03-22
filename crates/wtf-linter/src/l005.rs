@@ -61,7 +61,8 @@ impl L005Visitor {
                     if is_tokio_spawn_path(&path_expr.path) {
                         self.diagnostics.push(Diagnostic::new(
                             LintCode::L005,
-                            "tokio::spawn() is not allowed inside a procedural workflow function. \
+                            "tokio::spawn, tokio::task::spawn, or tokio::task::spawn_blocking \
+                             is not allowed inside a procedural workflow function. \
                              Spawned tasks detach from the workflow context and violate determinism.",
                         )
                         .with_suggestion(
@@ -183,7 +184,13 @@ fn is_workflow_impl(impl_item: &ItemImpl) -> bool {
 }
 
 fn is_tokio_spawn_path(path: &syn::Path) -> bool {
-    path.segments.len() == 2
-        && path.segments[0].ident == "tokio"
-        && path.segments[1].ident == "spawn"
+    match path.segments.len() {
+        2 => path.segments[0].ident == "tokio" && path.segments[1].ident == "spawn",
+        3 => {
+            path.segments[0].ident == "tokio"
+                && path.segments[1].ident == "task"
+                && (path.segments[2].ident == "spawn" || path.segments[2].ident == "spawn_blocking")
+        }
+        _ => false,
+    }
 }

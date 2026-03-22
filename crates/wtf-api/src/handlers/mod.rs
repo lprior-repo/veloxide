@@ -11,19 +11,35 @@ pub use signal::*;
 pub use workflow::*;
 
 use std::time::Duration;
-use wtf_actor::{messages::WorkflowParadigm, OrchestratorMsg};
-use wtf_common::InstanceId;
+use wtf_actor::OrchestratorMsg;
+use wtf_common::{InstanceId, WorkflowParadigm};
 use ractor::{ActorRef, rpc::CallResult};
 
 /// Timeout for all actor RPC calls from HTTP handlers.
 pub const ACTOR_CALL_TIMEOUT: Duration = Duration::from_secs(5);
 
-pub async fn get_nats(master: &ActorRef<OrchestratorMsg>) -> Option<wtf_storage::NatsClient> {
-    master.call(|tx| OrchestratorMsg::GetNatsContext { reply: tx }, Some(ACTOR_CALL_TIMEOUT)).await.ok().and_then(|r| match r { CallResult::Success(s) => s, _ => None })
+use std::sync::Arc;
+use wtf_common::{EventStore, StateStore};
+
+pub async fn get_event_store(master: &ActorRef<OrchestratorMsg>) -> Option<Arc<dyn EventStore>> {
+    master.call(|tx| OrchestratorMsg::GetEventStore { reply: tx }, Some(ACTOR_CALL_TIMEOUT))
+        .await
+        .ok()
+        .and_then(|r| match r { CallResult::Success(s) => s, _ => None })
+}
+
+pub async fn get_state_store(master: &ActorRef<OrchestratorMsg>) -> Option<Arc<dyn StateStore>> {
+    master.call(|tx| OrchestratorMsg::GetStateStore { reply: tx }, Some(ACTOR_CALL_TIMEOUT))
+        .await
+        .ok()
+        .and_then(|r| match r { CallResult::Success(s) => s, _ => None })
 }
 
 pub async fn get_db(master: &ActorRef<OrchestratorMsg>) -> Option<sled::Db> {
-    master.call(|tx| OrchestratorMsg::GetSnapshotDb { reply: tx }, Some(ACTOR_CALL_TIMEOUT)).await.ok().and_then(|r| match r { CallResult::Success(s) => s, _ => None })
+    master.call(|tx| OrchestratorMsg::GetSnapshotDb { reply: tx }, Some(ACTOR_CALL_TIMEOUT))
+        .await
+        .ok()
+        .and_then(|r| match r { CallResult::Success(s) => s, _ => None })
 }
 
 /// Split a path `<namespace>/<instance_id>` into the two parts.
@@ -50,9 +66,9 @@ pub(crate) fn paradigm_to_str(p: WorkflowParadigm) -> &'static str {
     }
 }
 
-pub(crate) fn phase_to_str(p: wtf_actor::messages::InstancePhaseView) -> &'static str {
+pub(crate) fn phase_to_str(p: wtf_actor::InstancePhaseView) -> &'static str {
     match p {
-        wtf_actor::messages::InstancePhaseView::Replay => "replay",
-        wtf_actor::messages::InstancePhaseView::Live => "live",
+        wtf_actor::InstancePhaseView::Replay => "replay",
+        wtf_actor::InstancePhaseView::Live => "live",
     }
 }

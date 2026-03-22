@@ -1,4 +1,4 @@
-use wtf_linter::lint_workflow_code;
+use wtf_linter::lint_workflow_code_l006 as lint_workflow_code;
 use wtf_linter::LintCode;
 
 #[test]

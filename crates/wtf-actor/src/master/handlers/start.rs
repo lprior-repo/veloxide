@@ -1,6 +1,6 @@
 use ractor::{Actor, ActorRef, RpcReplyPort};
-use wtf_common::{InstanceId, NamespaceId};
-use crate::messages::{InstanceArguments, InstanceMetadata, OrchestratorMsg, StartError, WorkflowParadigm};
+use wtf_common::{InstanceId, NamespaceId, WorkflowParadigm, InstanceMetadata};
+use crate::messages::{InstanceArguments, OrchestratorMsg, StartError};
 use crate::master::state::OrchestratorState;
 use crate::instance::WorkflowInstance;
 
@@ -53,7 +53,9 @@ fn build_args(
         paradigm,
         input,
         engine_node_id: state.config.engine_node_id.clone(),
-        nats: state.config.nats.clone(),
+        event_store: state.config.event_store.clone(),
+        state_store: state.config.state_store.clone(),
+        task_queue: state.config.task_queue.clone(),
         snapshot_db: state.config.snapshot_db.clone(),
         procedural_workflow: state.registry.get_procedural(&wtype),
         workflow_definition: state.registry.get_definition(&wtype),
@@ -77,9 +79,9 @@ async fn spawn_and_register(
 }
 
 async fn persist_metadata(state: &OrchestratorState, args: &InstanceArguments) {
-    let Some(nats) = &state.config.nats else { return };
-    let js = nats.jetstream();
-    let Ok(kv) = js.get_key_value(wtf_storage::bucket_names::INSTANCES).await else { return };
+    let Some(store) = &state.config.state_store else {
+        return;
+    };
 
     let metadata = InstanceMetadata {
         namespace: args.namespace.clone(),
@@ -89,8 +91,5 @@ async fn persist_metadata(state: &OrchestratorState, args: &InstanceArguments) {
         engine_node_id: state.config.engine_node_id.clone(),
     };
 
-    if let Ok(json) = serde_json::to_vec(&metadata) {
-        let key = wtf_storage::instance_key(metadata.namespace.as_str(), &metadata.instance_id);
-        let _ = kv.put(&key, json.into()).await;
-    }
+    let _ = store.put_instance_metadata(metadata).await;
 }

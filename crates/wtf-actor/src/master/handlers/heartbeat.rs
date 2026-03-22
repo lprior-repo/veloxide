@@ -1,6 +1,6 @@
 use ractor::{Actor, ActorRef};
-use wtf_common::InstanceId;
-use crate::messages::{InstanceArguments, InstanceMetadata, OrchestratorMsg};
+use wtf_common::{InstanceId, InstanceMetadata};
+use crate::messages::{InstanceArguments, OrchestratorMsg};
 use crate::master::state::OrchestratorState;
 use crate::instance::WorkflowInstance;
 
@@ -24,11 +24,11 @@ pub async fn handle_heartbeat_expired(
 }
 
 async fn fetch_metadata(state: &OrchestratorState, id: &InstanceId) -> Option<InstanceMetadata> {
-    let js = state.config.nats.as_ref()?.jetstream();
-    let kv = js.get_key_value(wtf_storage::bucket_names::INSTANCES).await.ok()?;
-    let key = wtf_storage::instance_key("", id);
-    let raw = kv.get(&key).await.ok()??;
-    serde_json::from_slice(&raw).ok()
+    if let Some(store) = &state.config.state_store {
+        store.get_instance_metadata(id).await.ok().flatten()
+    } else {
+        None
+    }
 }
 
 fn build_recovery_args(state: &OrchestratorState, m: &InstanceMetadata) -> InstanceArguments {
@@ -39,7 +39,9 @@ fn build_recovery_args(state: &OrchestratorState, m: &InstanceMetadata) -> Insta
         paradigm: m.paradigm,
         input: bytes::Bytes::new(),
         engine_node_id: state.config.engine_node_id.clone(),
-        nats: state.config.nats.clone(),
+        event_store: state.config.event_store.clone(),
+        state_store: state.config.state_store.clone(),
+        task_queue: state.config.task_queue.clone(),
         snapshot_db: state.config.snapshot_db.clone(),
         procedural_workflow: state.registry.get_procedural(&m.workflow_type),
         workflow_definition: state.registry.get_definition(&m.workflow_type),

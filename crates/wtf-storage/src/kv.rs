@@ -36,68 +36,61 @@ pub struct KvStores {
 /// # Errors
 /// Returns [`WtfError::NatsPublish`] if any bucket creation fails.
 pub async fn provision_kv_buckets(js: &Context) -> Result<KvStores, WtfError> {
-    let instances = create_or_get_kv(
-        js,
-        KvConfig {
-            bucket: "wtf-instances".to_owned(),
-            description: "Current status of workflow instances".to_owned(),
-            num_replicas: 1,
-            storage: async_nats::jetstream::stream::StorageType::File,
-            history: 1,
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let timers = create_or_get_kv(
-        js,
-        KvConfig {
-            bucket: "wtf-timers".to_owned(),
-            description: "Pending workflow timers".to_owned(),
-            num_replicas: 1,
-            storage: async_nats::jetstream::stream::StorageType::File,
-            history: 1,
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let definitions = create_or_get_kv(
-        js,
-        KvConfig {
-            bucket: "wtf-definitions".to_owned(),
-            description: "Workflow type definitions".to_owned(),
-            num_replicas: 1,
-            storage: async_nats::jetstream::stream::StorageType::File,
-            history: 5, // Keep last 5 versions of each definition
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    // wtf-heartbeats: Memory storage, 10s TTL (ADR-014).
-    // When the TTL expires, the entry is deleted — the heartbeat watcher
-    // sees the deletion and triggers recovery for that instance.
-    let heartbeats = create_or_get_kv(
-        js,
-        KvConfig {
-            bucket: "wtf-heartbeats".to_owned(),
-            description: "Engine actor heartbeats — expiry triggers crash recovery".to_owned(),
-            num_replicas: 1,
-            storage: async_nats::jetstream::stream::StorageType::Memory,
-            history: 1,
-            max_age: Duration::from_secs(10), // 10s TTL — expiry = crash detected
-            ..Default::default()
-        },
-    )
-    .await?;
-
     Ok(KvStores {
-        instances,
-        timers,
-        definitions,
-        heartbeats,
+        instances: provision_instances_kv(js).await?,
+        timers: provision_timers_kv(js).await?,
+        definitions: provision_definitions_kv(js).await?,
+        heartbeats: provision_heartbeats_kv(js).await?,
     })
+}
+
+async fn provision_instances_kv(js: &Context) -> Result<Store, WtfError> {
+    create_or_get_kv(js, KvConfig {
+        bucket: bucket_names::INSTANCES.to_owned(),
+        description: "Current status of workflow instances".to_owned(),
+        num_replicas: 1,
+        storage: async_nats::jetstream::stream::StorageType::File,
+        history: 1,
+        ..Default::default()
+    })
+    .await
+}
+
+async fn provision_timers_kv(js: &Context) -> Result<Store, WtfError> {
+    create_or_get_kv(js, KvConfig {
+        bucket: bucket_names::TIMERS.to_owned(),
+        description: "Pending workflow timers".to_owned(),
+        num_replicas: 1,
+        storage: async_nats::jetstream::stream::StorageType::File,
+        history: 1,
+        ..Default::default()
+    })
+    .await
+}
+
+async fn provision_definitions_kv(js: &Context) -> Result<Store, WtfError> {
+    create_or_get_kv(js, KvConfig {
+        bucket: bucket_names::DEFINITIONS.to_owned(),
+        description: "Workflow type definitions".to_owned(),
+        num_replicas: 1,
+        storage: async_nats::jetstream::stream::StorageType::File,
+        history: 5,
+        ..Default::default()
+    })
+    .await
+}
+
+async fn provision_heartbeats_kv(js: &Context) -> Result<Store, WtfError> {
+    create_or_get_kv(js, KvConfig {
+        bucket: bucket_names::HEARTBEATS.to_owned(),
+        description: "Engine actor heartbeats — expiry triggers crash recovery".to_owned(),
+        num_replicas: 1,
+        storage: async_nats::jetstream::stream::StorageType::Memory,
+        history: 1,
+        max_age: Duration::from_secs(10),
+        ..Default::default()
+    })
+    .await
 }
 
 async fn create_or_get_kv(js: &Context, config: KvConfig) -> Result<Store, WtfError> {

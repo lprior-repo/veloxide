@@ -37,30 +37,19 @@ impl Actor for MasterOrchestrator {
         state: &mut OrchestratorState,
     ) -> Result<(), ActorProcessingErr> {
         match msg {
-            OrchestratorMsg::StartWorkflow { namespace, instance_id, workflow_type, paradigm, input, reply } => {
-                handlers::handle_start_workflow(myself, state, namespace, instance_id, workflow_type, paradigm, input, reply).await;
+            OrchestratorMsg::GetEventStore { reply } => {
+                let _ = reply.send(state.config.event_store.clone());
             }
-            OrchestratorMsg::Signal { instance_id, signal_name, payload, reply } => {
-                handlers::handle_signal(state, instance_id, signal_name, payload, reply);
+            OrchestratorMsg::GetStateStore { reply } => {
+                let _ = reply.send(state.config.state_store.clone());
             }
-            OrchestratorMsg::Terminate { instance_id, reason, reply } => {
-                handlers::handle_terminate(state, instance_id, reason, reply).await;
-            }
-            OrchestratorMsg::GetStatus { instance_id, reply } => {
-                let _ = reply.send(handlers::handle_get_status(state, &instance_id).await);
-            }
-            OrchestratorMsg::ListActive { reply } => {
-                let _ = reply.send(handlers::handle_list_active(state).await);
-            }
-            OrchestratorMsg::GetNatsContext { reply } => {
-                let _ = reply.send(state.config.nats.clone());
+            OrchestratorMsg::GetTaskQueue { reply } => {
+                let _ = reply.send(state.config.task_queue.clone());
             }
             OrchestratorMsg::GetSnapshotDb { reply } => {
                 let _ = reply.send(state.config.snapshot_db.clone());
             }
-            OrchestratorMsg::HeartbeatExpired { instance_id } => {
-                handlers::handle_heartbeat_expired(myself, state, instance_id).await;
-            }
+            _ => handle_other_msg(myself, msg, state).await,
         }
         Ok(())
     }
@@ -75,6 +64,34 @@ impl Actor for MasterOrchestrator {
             handle_child_termination(state, actor_cell, reason);
         }
         Ok(())
+    }
+}
+
+async fn handle_other_msg(
+    myself: ActorRef<OrchestratorMsg>,
+    msg: OrchestratorMsg,
+    state: &mut OrchestratorState,
+) {
+    match msg {
+        OrchestratorMsg::StartWorkflow { namespace, instance_id, workflow_type, paradigm, input, reply } => {
+            handlers::handle_start_workflow(myself, state, namespace, instance_id, workflow_type, paradigm, input, reply).await;
+        }
+        OrchestratorMsg::Signal { instance_id, signal_name, payload, reply } => {
+            handlers::handle_signal(state, instance_id, signal_name, payload, reply);
+        }
+        OrchestratorMsg::Terminate { instance_id, reason, reply } => {
+            handlers::handle_terminate(state, instance_id, reason, reply).await;
+        }
+        OrchestratorMsg::GetStatus { instance_id, reply } => {
+            let _ = reply.send(handlers::handle_get_status(state, &instance_id).await);
+        }
+        OrchestratorMsg::ListActive { reply } => {
+            let _ = reply.send(handlers::handle_list_active(state).await);
+        }
+        OrchestratorMsg::HeartbeatExpired { instance_id } => {
+            handlers::handle_heartbeat_expired(myself, state, instance_id).await;
+        }
+        _ => {}
     }
 }
 

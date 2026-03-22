@@ -9,7 +9,9 @@
 #![forbid(unsafe_code)]
 
 pub mod events;
+pub mod storage;
 pub mod types;
 
 pub use events::{EffectDeclaration, RetryPolicy, WorkflowEvent};
+pub use storage::{EventStore, StateStore, TaskQueue};
 pub use types::*;

@@ -1,4 +1,4 @@
-use wtf_linter::lint_workflow_code;
+use wtf_linter::lint_workflow_code_l005 as lint_workflow_code;
 use wtf_linter::LintCode;
 
 #[test]
@@ -149,4 +149,94 @@ impl WorkflowFn for MyWorkflow {
     let result = lint_workflow_code(source);
     assert!(result.is_ok());
     assert!(result.unwrap().is_empty());
+}
+
+#[test]
+fn test_violation_tokio_task_spawn_in_workflow() {
+    let source = r#"
+impl WorkflowFn for MyWorkflow {
+    async fn execute(&self, ctx: WorkflowContext) -> anyhow::Result<()> {
+        tokio::task::spawn(async {
+            println!("detached task");
+        });
+        Ok(())
+    }
+}
+"#;
+    let result = lint_workflow_code(source);
+    assert!(result.is_ok());
+    let diagnostics = result.unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code, LintCode::L005);
+}
+
+#[test]
+fn test_violation_tokio_task_spawn_blocking_in_workflow() {
+    let source = r#"
+impl WorkflowFn for MyWorkflow {
+    async fn execute(&self, ctx: WorkflowContext) -> anyhow::Result<()> {
+        tokio::task::spawn_blocking(|| {
+            println!("blocking task");
+        });
+        Ok(())
+    }
+}
+"#;
+    let result = lint_workflow_code(source);
+    assert!(result.is_ok());
+    let diagnostics = result.unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code, LintCode::L005);
+}
+
+#[test]
+fn test_multiple_different_spawn_types() {
+    let source = r#"
+impl WorkflowFn for MyWorkflow {
+    async fn execute(&self, ctx: WorkflowContext) -> anyhow::Result<()> {
+        tokio::spawn(async { println!("first"); });
+        tokio::task::spawn(async { println!("second"); });
+        tokio::task::spawn_blocking(|| { println!("third"); });
+        Ok(())
+    }
+}
+"#;
+    let result = lint_workflow_code(source);
+    assert!(result.is_ok());
+    let diagnostics = result.unwrap();
+    assert_eq!(diagnostics.len(), 3);
+}
+
+#[test]
+fn test_tokio_task_spawn_with_turbofish() {
+    let source = r#"
+impl WorkflowFn for MyWorkflow {
+    async fn execute(&self, ctx: WorkflowContext) -> anyhow::Result<()> {
+        tokio::task::spawn::<(), _>(async { Ok(()) });
+        Ok(())
+    }
+}
+"#;
+    let result = lint_workflow_code(source);
+    assert!(result.is_ok());
+    let diagnostics = result.unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code, LintCode::L005);
+}
+
+#[test]
+fn test_tokio_task_spawn_blocking_with_turbofish() {
+    let source = r#"
+impl WorkflowFn for MyWorkflow {
+    async fn execute(&self, ctx: WorkflowContext) -> anyhow::Result<()> {
+        tokio::task::spawn_blocking::<_, ()>(|| { });
+        Ok(())
+    }
+}
+"#;
+    let result = lint_workflow_code(source);
+    assert!(result.is_ok());
+    let diagnostics = result.unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code, LintCode::L005);
 }

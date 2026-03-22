@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::{
     extract::Extension,
@@ -20,6 +21,7 @@ use axum::{
     Router,
 };
 use ractor::ActorRef;
+use tokio::sync::Semaphore;
 use tower_http::trace::TraceLayer;
 use wtf_actor::OrchestratorMsg;
 use wtf_storage::kv::KvStores;
@@ -44,6 +46,8 @@ use crate::{handlers, health, sse};
 /// - `GET /api/v1/watch/:namespace` — watch instances in namespace
 #[must_use]
 pub fn build_app(master: ActorRef<OrchestratorMsg>, kv: KvStores) -> Router {
+    let sse_semaphore = Arc::new(Semaphore::new(sse::MAX_SSE_WATCHERS));
+
     let api_routes = Router::new()
         .route("/workflows", post(handlers::start_workflow))
         .route("/workflows", get(handlers::list_workflows))
@@ -56,6 +60,7 @@ pub fn build_app(master: ActorRef<OrchestratorMsg>, kv: KvStores) -> Router {
         .route("/watch", get(sse::watch_all))
         .route("/watch/:namespace", get(sse::watch_namespace))
         .layer(Extension(master))
+        .layer(Extension(sse_semaphore))
         .layer(Extension(kv));
 
     Router::new()

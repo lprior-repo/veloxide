@@ -1,12 +1,12 @@
 {
-  "session_id": "9e9db3a1-4e06-4f3a-9a17-7bee22675de5",
-  "transcript_path": "/home/lewis/.claude/projects/-home-lewis-src-wtf-engine/9e9db3a1-4e06-4f3a-9a17-7bee22675de5.jsonl",
+  "session_id": "43b685e4-bcfd-464f-9b2a-75fd63952e3b",
+  "transcript_path": "/home/lewis/.claude/projects/-home-lewis-src-wtf-engine/43b685e4-bcfd-464f-9b2a-75fd63952e3b.jsonl",
   "hook_event_name": "PreToolUse",
   "tool_name": "Edit",
   "tool_input": {
     "file_path": "/home/lewis/src/wtf-engine/crates/wtf-actor/src/procedural/context.rs",
-    "old_string": "    /// Return the next deterministic operation ID for this instance.\n    #[must_use]\n    pub fn next_op_id(&self) -> ActivityId {\n        ActivityId::procedural(&self.instance_id, self.op_counter.load(Ordering::SeqCst))\n    }",
-    "new_string": "    /// Return the next deterministic operation ID for this instance.\n    #[must_use]\n    pub fn next_op_id(&self) -> ActivityId {\n        fetch_and_increment(&self.instance_id, &self.op_counter)\n    }",
+    "old_string": "    /// Sample a deterministic random u64.\n    pub async fn random_u64(&self) -> anyhow::Result<u64> {\n        let result = self\n            .myself\n            .call(\n                |reply| crate::messages::InstanceMsg::ProceduralRandom { reply },\n                None,\n            )\n            .await?;",
+    "new_string": "    /// Sample a deterministic random u64.\n    pub async fn random_u64(&self) -> anyhow::Result<u64> {\n        let operation_id = self.op_counter.load(Ordering::SeqCst);\n        let result = self\n            .myself\n            .call(\n                |reply| crate::messages::InstanceMsg::ProceduralRandom { operation_id, reply },\n                None,\n            )\n            .await?;",
     "replace_all": false
   }
 }

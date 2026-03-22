@@ -137,10 +137,11 @@ impl WorkflowContext {
 
     /// Sample the current UTC time deterministically.
     pub async fn now(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
+        let operation_id = self.op_counter.load(Ordering::SeqCst);
         let result = self
             .myself
             .call(
-                |reply| crate::messages::InstanceMsg::ProceduralNow { reply },
+                |reply| crate::messages::InstanceMsg::ProceduralNow { operation_id, reply },
                 None,
             )
             .await?;
@@ -155,10 +156,11 @@ impl WorkflowContext {
 
     /// Sample a deterministic random u64.
     pub async fn random_u64(&self) -> anyhow::Result<u64> {
+        let operation_id = self.op_counter.load(Ordering::SeqCst);
         let result = self
             .myself
             .call(
-                |reply| crate::messages::InstanceMsg::ProceduralRandom { reply },
+                |reply| crate::messages::InstanceMsg::ProceduralRandom { operation_id, reply },
                 None,
             )
             .await?;

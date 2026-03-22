@@ -5252,6 +5252,7 @@ dependencies = [
 name = "wtf-common"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "chrono",
  "rmp-serde",
@@ -5321,6 +5322,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats",
+ "async-trait",
  "bytes",
  "chrono",
  "crc32fast",

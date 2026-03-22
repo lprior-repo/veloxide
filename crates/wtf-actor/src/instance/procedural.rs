@@ -1,11 +1,12 @@
 //! Procedural-specific message handlers for WorkflowInstance.
 
 use bytes::Bytes;
-use ractor::ActorRef;
 use wtf_common::{ActivityId, WtfError, WorkflowEvent};
-use crate::messages::InstanceMsg;
 use super::state::InstanceState;
 use super::lifecycle::ParadigmState;
+use super::handlers;
+
+pub use super::procedural_utils::{handle_now, handle_random, handle_completed, handle_failed};
 
 pub async fn handle_get_checkpoint(
     state: &InstanceState,
@@ -26,14 +27,8 @@ pub async fn handle_dispatch(
     payload: Bytes,
     reply: ractor::RpcReplyPort<Result<Bytes, WtfError>>,
 ) {
-    if let ParadigmState::Procedural(_) = &state.paradigm_state {
-        let op_id = if let ParadigmState::Procedural(s) = &state.paradigm_state {
-            s.operation_counter
-        } else {
-            0
-        };
-        let activity_id = ActivityId::procedural(&state.args.instance_id, op_id);
-
+    if let ParadigmState::Procedural(s) = &state.paradigm_state {
+        let activity_id = ActivityId::procedural(&state.args.instance_id, s.operation_counter);
         let event = WorkflowEvent::ActivityDispatched {
             activity_id: activity_id.to_string(),
             activity_type,
@@ -41,27 +36,37 @@ pub async fn handle_dispatch(
             retry_policy: wtf_common::RetryPolicy::default(),
             attempt: 1,
         };
+        append_and_inject_event(state, event, Some(activity_id), reply).await;
+    }
+}
 
-        if let Some(nats) = &state.args.nats {
-            let js = nats.jetstream();
-            match wtf_storage::append_event(
-                js,
-                &state.args.namespace,
-                &state.args.instance_id,
-                &event,
-            )
-            .await
-            {
-                Ok(seq) => {
-                    state.pending_activity_calls.insert(activity_id, reply);
-                    let _ = super::handle_inject_event(state, seq, &event).await;
-                }
-                Err(e) => {
-                    let _ = reply.send(Err(e));
-                }
+async fn append_and_inject_event(
+    state: &mut InstanceState,
+    event: WorkflowEvent,
+    activity_id: Option<ActivityId>,
+    reply: ractor::RpcReplyPort<Result<Bytes, WtfError>>,
+) {
+    let store = match &state.args.event_store {
+        Some(s) => s,
+        None => {
+            let _ = reply.send(Err(WtfError::nats_publish("Event store missing")));
+            return;
+        }
+    };
+
+    match store.publish(
+        &state.args.namespace,
+        &state.args.instance_id,
+        event.clone(),
+    ).await {
+        Ok(seq) => {
+            if let Some(aid) = activity_id {
+                state.pending_activity_calls.insert(aid, reply);
             }
-        } else {
-            let _ = reply.send(Err(WtfError::nats_publish("NATS missing")));
+            let _ = handlers::inject_event(state, seq, &event).await;
+        }
+        Err(e) => {
+            let _ = reply.send(Err(e));
         }
     }
 }
@@ -81,67 +86,37 @@ pub async fn handle_sleep(
             fire_at,
         };
 
-        if let Some(nats) = &state.args.nats {
-            let js = nats.jetstream();
-            match wtf_storage::append_event(
-                js,
-                &state.args.namespace,
-                &state.args.instance_id,
-                &event,
-            )
-            .await
-            {
-                Ok(seq) => {
-                    state.pending_timer_calls.insert(timer_id, reply);
-                    let _ = super::handle_inject_event(state, seq, &event).await;
-                }
-                Err(e) => {
-                    let _ = reply.send(Err(e));
-                }
-            }
-        } else {
-            let _ = reply.send(Err(WtfError::nats_publish("NATS missing")));
+        append_and_inject_timer_event(state, event, timer_id, reply).await;
+    }
+}
+
+async fn append_and_inject_timer_event(
+    state: &mut InstanceState,
+    event: WorkflowEvent,
+    timer_id: wtf_common::TimerId,
+    reply: ractor::RpcReplyPort<Result<(), WtfError>>,
+) {
+    let store = match &state.args.event_store {
+        Some(s) => s,
+        None => {
+            let _ = reply.send(Err(WtfError::nats_publish("Event store missing")));
+            return;
+        }
+    };
+
+    match store.publish(
+        &state.args.namespace,
+        &state.args.instance_id,
+        event.clone(),
+    ).await {
+        Ok(seq) => {
+            state.pending_timer_calls.insert(timer_id, reply);
+            let _ = handlers::inject_event(state, seq, &event).await;
+        }
+        Err(e) => {
+            let _ = reply.send(Err(e));
         }
     }
-}
-
-pub async fn handle_completed(
-    myself_ref: ActorRef<InstanceMsg>,
-    state: &InstanceState,
-) {
-    tracing::info!(instance_id = %state.args.instance_id, "Procedural workflow completed");
-    let event = WorkflowEvent::InstanceCompleted {
-        output: bytes::Bytes::new(),
-    };
-    if let Some(nats) = &state.args.nats {
-        let _ = wtf_storage::append_event(
-            nats.jetstream(),
-            &state.args.namespace,
-            &state.args.instance_id,
-            &event,
-        )
-        .await;
-    }
-    myself_ref.stop(Some("workflow completed".to_string()));
-}
-
-pub async fn handle_failed(
-    myself_ref: ActorRef<InstanceMsg>,
-    state: &InstanceState,
-    err: String,
-) {
-    tracing::error!(instance_id = %state.args.instance_id, error = %err, "Procedural workflow failed");
-    let event = WorkflowEvent::InstanceFailed { error: err };
-    if let Some(nats) = &state.args.nats {
-        let _ = wtf_storage::append_event(
-            nats.jetstream(),
-            &state.args.namespace,
-            &state.args.instance_id,
-            &event,
-        )
-        .await;
-    }
-    myself_ref.stop(Some("workflow failed".to_string()));
 }
 
 #[cfg(test)]
@@ -163,7 +138,9 @@ mod tests {
             paradigm: WorkflowParadigm::Procedural,
             input: Bytes::new(),
             engine_node_id: "n1".into(),
-            nats: None,
+            event_store: None,
+            state_store: None,
+            task_queue: None,
             snapshot_db: None,
             procedural_workflow: None,
             workflow_definition: None,
@@ -176,6 +153,7 @@ mod tests {
             pending_activity_calls: HashMap::new(),
             pending_timer_calls: HashMap::new(),
             procedural_task: None,
+            live_subscription_task: None,
             args,
         };
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -213,7 +191,9 @@ mod tests {
             paradigm: WorkflowParadigm::Procedural,
             input: Bytes::new(),
             engine_node_id: "n1".into(),
-            nats: None,
+            event_store: None,
+            state_store: None,
+            task_queue: None,
             snapshot_db: None,
             procedural_workflow: None,
             workflow_definition: None,
@@ -226,6 +206,7 @@ mod tests {
             pending_activity_calls: HashMap::new(),
             pending_timer_calls: HashMap::new(),
             procedural_task: None,
+            live_subscription_task: None,
             args,
         };
 
@@ -234,53 +215,5 @@ mod tests {
         let result = rx.await.expect("reply");
         assert!(result.is_some(), "checkpoint must be present after ActivityCompleted");
         assert_eq!(result.expect("checkpoint present").result, Bytes::from_static(b"done"));
-    }
-}
-
-pub async fn handle_now(
-    state: &mut InstanceState,
-    reply: ractor::RpcReplyPort<chrono::DateTime<chrono::Utc>>,
-) {
-    if let super::lifecycle::ParadigmState::Procedural(s) = &state.paradigm_state {
-        let op_id = s.operation_counter;
-        if let Some(cp) = s.get_checkpoint(op_id) {
-            let millis = i64::from_le_bytes(cp.result.as_ref().try_into().unwrap_or([0u8; 8]));
-            let ts = chrono::DateTime::from_timestamp_millis(millis)
-                .unwrap_or_else(chrono::Utc::now);
-            let _ = reply.send(ts);
-            return;
-        }
-        let ts = chrono::Utc::now();
-        let event = wtf_common::WorkflowEvent::NowSampled { operation_id: op_id, ts };
-        if let Some(nats) = &state.args.nats {
-            let js = nats.jetstream();
-            if let Ok(seq) = wtf_storage::append_event(js, &state.args.namespace, &state.args.instance_id, &event).await {
-                let _ = super::handle_inject_event(state, seq, &event).await;
-            }
-        }
-        let _ = reply.send(ts);
-    }
-}
-
-pub async fn handle_random(
-    state: &mut InstanceState,
-    reply: ractor::RpcReplyPort<u64>,
-) {
-    if let super::lifecycle::ParadigmState::Procedural(s) = &state.paradigm_state {
-        let op_id = s.operation_counter;
-        if let Some(cp) = s.get_checkpoint(op_id) {
-            let value = u64::from_le_bytes(cp.result.as_ref().try_into().unwrap_or([0u8; 8]));
-            let _ = reply.send(value);
-            return;
-        }
-        let value: u64 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.subsec_nanos() as u64 ^ (d.as_secs() << 32));
-        let event = wtf_common::WorkflowEvent::RandomSampled { operation_id: op_id, value };
-        if let Some(nats) = &state.args.nats {
-            let js = nats.jetstream();
-            if let Ok(seq) = wtf_storage::append_event(js, &state.args.namespace, &state.args.instance_id, &event).await {
-                let _ = super::handle_inject_event(state, seq, &event).await;
-            }
-        }
-        let _ = reply.send(value);
     }
 }

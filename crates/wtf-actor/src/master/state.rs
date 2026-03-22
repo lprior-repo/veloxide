@@ -2,8 +2,8 @@ use crate::master::registry::WorkflowRegistry;
 use crate::messages::InstanceMsg;
 use ractor::ActorRef;
 use std::collections::HashMap;
-use wtf_common::InstanceId;
-use wtf_storage::NatsClient;
+use std::sync::Arc;
+use wtf_common::{EventStore, InstanceId, StateStore, TaskQueue};
 
 /// Configuration for the MasterOrchestrator.
 #[derive(Debug, Clone)]
@@ -12,10 +12,14 @@ pub struct OrchestratorConfig {
     pub max_instances: usize,
     /// Unique identifier for this engine node.
     pub engine_node_id: String,
-    /// NATS client for JetStream and KV operations.
-    pub nats: Option<NatsClient>,
     /// Sled database handle for snapshot storage.
     pub snapshot_db: Option<sled::Db>,
+    /// Abstract event store for writing events.
+    pub event_store: Option<Arc<dyn EventStore>>,
+    /// Abstract state store for heartbeats and metadata.
+    pub state_store: Option<Arc<dyn StateStore>>,
+    /// Abstract task queue for activity dispatch.
+    pub task_queue: Option<Arc<dyn TaskQueue>>,
 }
 
 impl Default for OrchestratorConfig {
@@ -23,8 +27,10 @@ impl Default for OrchestratorConfig {
         Self {
             max_instances: 1000,
             engine_node_id: "engine-local".into(),
-            nats: None,
             snapshot_db: None,
+            event_store: None,
+            state_store: None,
+            task_queue: None,
         }
     }
 }
@@ -88,8 +94,10 @@ mod tests {
         OrchestratorConfig {
             max_instances: 10,
             engine_node_id: "node-test".into(),
-            nats: None,
             snapshot_db: None,
+            event_store: None,
+            state_store: None,
+            task_queue: None,
         }
     }
 
@@ -110,8 +118,10 @@ mod tests {
         let config = OrchestratorConfig {
             max_instances: 0,
             engine_node_id: "node".into(),
-            nats: None,
             snapshot_db: None,
+            event_store: None,
+            state_store: None,
+            task_queue: None,
         };
         let state = OrchestratorState::new(config);
         assert!(!state.has_capacity());

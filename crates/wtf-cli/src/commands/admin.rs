@@ -62,14 +62,7 @@ impl FromStr for ViewName {
 
 pub async fn run_rebuild_views(config: RebuildViewsConfig) -> anyhow::Result<std::process::ExitCode> {
     if config.dry_run {
-        println!("[dry-run] Would rebuild views");
-        if let Some(ref v) = config.view {
-            println!("[dry-run]   view: {}", v);
-        }
-        if let Some(ref ns) = config.namespace {
-            println!("[dry-run]   namespace: {}", ns);
-        }
-        return Ok(std::process::ExitCode::SUCCESS);
+        return run_dry_run(&config);
     }
 
     let nats_config = NatsConfig::default();
@@ -89,29 +82,42 @@ pub async fn run_rebuild_views(config: RebuildViewsConfig) -> anyhow::Result<std
         println!("KV buckets provisioned");
     }
 
-    let view_filter = config.view.as_ref().map(|v| {
-        ViewName::parse(v).unwrap_or_else(|| {
-            eprintln!("error: invalid view '{}'. Valid views: instances, timers, definitions, heartbeats", v);
-            std::process::exit(1);
-        })
-    });
-
+    let view_filter = config.view.as_ref().map(parse_view_name);
     let start = Instant::now();
     let stats = rebuild_views(&stores, &config.namespace, view_filter.as_ref(), config.show_progress)
         .await
         .context("rebuild failed")?;
 
-    let duration_ms = start.elapsed().as_millis() as u64;
+    print_rebuild_summary(stats, start.elapsed());
+    Ok(std::process::ExitCode::SUCCESS)
+}
 
+fn run_dry_run(config: &RebuildViewsConfig) -> anyhow::Result<std::process::ExitCode> {
+    println!("[dry-run] Would rebuild views");
+    if let Some(ref v) = config.view {
+        println!("[dry-run]   view: {}", v);
+    }
+    if let Some(ref ns) = config.namespace {
+        println!("[dry-run]   namespace: {}", ns);
+    }
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+fn parse_view_name(v: &String) -> ViewName {
+    ViewName::parse(v).unwrap_or_else(|| {
+        eprintln!("error: invalid view '{}'. Valid views: instances, timers, definitions, heartbeats", v);
+        std::process::exit(1);
+    })
+}
+
+fn print_rebuild_summary(stats: RebuildStats, duration: std::time::Duration) {
     println!();
     println!("Rebuild complete:");
     println!("  instances: {}", stats.instances_rebuilt);
     println!("  timers: {}", stats.timers_rebuilt);
     println!("  definitions: {}", stats.definitions_rebuilt);
     println!("  events processed: {}", stats.events_processed);
-    println!("  duration: {}ms", duration_ms);
-
-    Ok(std::process::ExitCode::SUCCESS)
+    println!("  duration: {}ms", duration.as_millis());
 }
 
 async fn rebuild_views(

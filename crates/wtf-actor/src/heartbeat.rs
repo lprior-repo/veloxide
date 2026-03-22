@@ -67,42 +67,49 @@ pub async fn run_heartbeat_watcher(
     loop {
         tokio::select! {
             entry = watch.next() => {
-                match entry {
-                    None => {
-                        tracing::info!("heartbeat watch stream closed — stopping");
-                        break;
-                    }
-                    Some(Err(e)) => {
-                        tracing::warn!(error = %e, "heartbeat watch error — continuing");
-                    }
-                    Some(Ok(kv_entry)) => {
-                        // Only care about deletions (TTL expiry shows as Delete).
-                        if matches!(kv_entry.operation, Operation::Delete | Operation::Purge) {
-                            if let Some(instance_id) = instance_id_from_heartbeat_key(&kv_entry.key) {
-                                tracing::debug!(
-                                    instance_id = %instance_id,
-                                    "heartbeat expired — notifying orchestrator"
-                                );
-                                let _ = orchestrator.cast(OrchestratorMsg::HeartbeatExpired { instance_id });
-                            } else {
-                                tracing::warn!(key = %kv_entry.key, "unexpected heartbeat key format");
-                            }
-                        }
-                    }
+                let entry_processed = match entry {
+                    Some(res) => process_heartbeat_entry(Some(res.map_err(|e| e.to_string())), &orchestrator),
+                    None => process_heartbeat_entry(None::<Result<async_nats::jetstream::kv::Entry, String>>, &orchestrator),
+                };
+                if !entry_processed {
+                    break;
                 }
             }
-            result = shutdown_rx.changed() => {
-                match result {
-                    Ok(()) | Err(_) => {
-                        tracing::info!("heartbeat watcher shutting down");
-                        break;
-                    }
-                }
+            _ = shutdown_rx.changed() => {
+                tracing::info!("heartbeat watcher shutting down");
+                break;
             }
         }
     }
 
     Ok(())
+}
+
+fn process_heartbeat_entry<E: std::fmt::Display>(
+    entry: Option<Result<async_nats::jetstream::kv::Entry, E>>,
+    orchestrator: &ActorRef<OrchestratorMsg>,
+) -> bool {
+    match entry {
+        None => {
+            tracing::info!("heartbeat watch stream closed — stopping");
+            false
+        }
+        Some(Err(e)) => {
+            tracing::warn!(error = %e, "heartbeat watch error — continuing");
+            true
+        }
+        Some(Ok(kv_entry)) => {
+            if matches!(kv_entry.operation, Operation::Delete | Operation::Purge) {
+                if let Some(instance_id) = instance_id_from_heartbeat_key(&kv_entry.key) {
+                    tracing::debug!(instance_id = %instance_id, "heartbeat expired — notifying orchestrator");
+                    let _ = orchestrator.cast(OrchestratorMsg::HeartbeatExpired { instance_id });
+                } else {
+                    tracing::warn!(key = %kv_entry.key, "unexpected heartbeat key format");
+                }
+            }
+            true
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
-pub use crate::messages::{WorkflowDefinition, WorkflowParadigm};
 use crate::procedural::WorkflowFn;
 use std::collections::HashMap;
 use std::sync::Arc;
+pub use wtf_common::{WorkflowDefinition, WorkflowParadigm};
 
 /// Registry of available workflows known to this orchestrator node.
 #[derive(Debug, Default)]

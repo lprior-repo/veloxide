@@ -21,3 +21,6 @@ thiserror = { workspace = true }
 
 # ID generation
 ulid = { workspace = true }
+
+# Traits
+async-trait = { workspace = true }
