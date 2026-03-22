@@ -3,7 +3,7 @@
 #![deny(clippy::panic)]
 #![forbid(unsafe_code)]
 
-use syn::{visit::Visit, Expr, ExprMethodCall, Path};
+use syn::{spanned::Spanned, visit::Visit, Expr, ExprMethodCall, Path};
 
 use crate::diagnostic::{Diagnostic, LintCode};
 
@@ -136,8 +136,9 @@ impl<'ast> Visit<'ast> for DirectAsyncIoVisitor {
     }
 }
 
-fn loc_of(_expr: &Expr) -> Option<(usize, usize)> {
-    None
+fn loc_of(expr: &Expr) -> Option<(usize, usize)> {
+    let span = expr.span();
+    Some((span.start().column, span.end().column))
 }
 
 pub fn check_direct_async_io(
@@ -170,7 +171,9 @@ async fn workflow(ctx: &Ctx) -> Result<(), Error> {
 "#;
         let result = check(source);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
+        if let Ok(diags) = result {
+            assert!(diags.is_empty());
+        }
     }
 
     #[test]
@@ -271,5 +274,31 @@ async fn workflow(ctx: &Ctx) -> Result<(), Error> {
             result[0].suggestion.as_deref(),
             Some("wrap in ctx.activity(...)")
         );
+    }
+
+    #[test]
+    fn test_diagnostic_contains_error_severity() {
+        let source = r#"
+async fn workflow(ctx: &Ctx) -> Result<(), Error> {
+    let _ = reqwest::get("https://example.com").await;
+    Ok(())
+}
+"#;
+        let result = check(source).expect("should parse");
+        assert!(!result.is_empty());
+        assert_eq!(result[0].severity, crate::diagnostic::Severity::Error);
+    }
+
+    #[test]
+    fn test_diagnostic_contains_span() {
+        let source = r#"
+async fn workflow(ctx: &Ctx) -> Result<(), Error> {
+    let _ = reqwest::get("https://example.com").await;
+    Ok(())
+}
+"#;
+        let result = check(source).expect("should parse");
+        assert!(!result.is_empty());
+        assert!(result[0].span.is_some());
     }
 }
