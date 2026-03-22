@@ -7,6 +7,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use wtf_cli::admin::{run_rebuild_views, RebuildViewsConfig};
+use wtf_cli::lint::{explain_rule, run_lint, OutputFormat};
 use wtf_cli::serve::{run_serve, ServeConfig};
 
 #[derive(Parser)]
@@ -37,6 +38,10 @@ enum Commands {
         paths: Vec<String>,
         #[arg(long, default_value = "human")]
         format: String,
+        #[arg(long)]
+        check: bool,
+        #[arg(long, value_name = "RULE")]
+        explain: Option<String>,
     },
     Admin {
         #[command(subcommand)]
@@ -101,7 +106,12 @@ async fn handle_command(cmd: Commands) -> anyhow::Result<std::process::ExitCode>
             };
             handle_serve(config).await
         }
-        Commands::Lint { paths, .. } => handle_lint(paths).await,
+        Commands::Lint {
+            paths,
+            format,
+            check,
+            explain,
+        } => handle_lint(paths, format, check, explain).await,
         Commands::Admin { command } => handle_admin(command).await,
     }
 }
@@ -112,11 +122,36 @@ async fn handle_serve(config: ServeConfig) -> anyhow::Result<std::process::ExitC
     Ok(std::process::ExitCode::SUCCESS)
 }
 
-async fn handle_lint(paths: Vec<String>) -> anyhow::Result<std::process::ExitCode> {
+async fn handle_lint(
+    paths: Vec<String>,
+    format_str: String,
+    check: bool,
+    explain: Option<String>,
+) -> anyhow::Result<std::process::ExitCode> {
+    if let Some(rule) = explain {
+        if let Some(explanation) = explain_rule(&rule) {
+            println!("{explanation}");
+            return Ok(std::process::ExitCode::SUCCESS);
+        } else {
+            eprintln!("unknown rule: {rule}");
+            return Ok(std::process::ExitCode::from(2));
+        }
+    }
+
     if paths.is_empty() {
         anyhow::bail!("at least one path required");
     }
-    anyhow::bail!("lint command not yet implemented in this bead")
+
+    let output_format = match format_str.as_str() {
+        "human" | "text" => OutputFormat::Human,
+        "json" => OutputFormat::Json,
+        _ => OutputFormat::Human,
+    };
+
+    let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let exit_code = run_lint(&path_bufs, output_format, check)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    Ok(exit_code)
 }
 
 async fn handle_admin(cmd: AdminCommands) -> anyhow::Result<std::process::ExitCode> {
