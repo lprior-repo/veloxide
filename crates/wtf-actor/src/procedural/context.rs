@@ -40,7 +40,7 @@ impl WorkflowContext {
     /// Return the next deterministic operation ID for this instance.
     #[must_use]
     pub fn next_op_id(&self) -> ActivityId {
-        ActivityId::procedural(&self.instance_id, self.op_counter.load(Ordering::SeqCst))
+        fetch_and_increment(&self.instance_id, &self.op_counter)
     }
 
     /// Dispatch an activity and wait for its completion.
