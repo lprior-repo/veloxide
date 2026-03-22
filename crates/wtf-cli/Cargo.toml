@@ -11,6 +11,9 @@ wtf-storage = { path = "../wtf-storage" }
 wtf-actor = { path = "../wtf-actor" }
 wtf-worker = { path = "../wtf-worker" }
 wtf-linter = { path = "../wtf-linter" }
+wtf-api = { path = "../wtf-api" }
+
+ractor = { workspace = true }
 
 # CLI
 clap = { workspace = true }

@@ -117,8 +117,7 @@ async fn handle_command(cmd: Commands) -> anyhow::Result<std::process::ExitCode>
 }
 
 async fn handle_serve(config: ServeConfig) -> anyhow::Result<std::process::ExitCode> {
-    let _nats = run_serve(config).await.context("serve command failed")?;
-    println!("Storage provisioned. Server ready.");
+    run_serve(config).await.context("serve command failed")?;
     Ok(std::process::ExitCode::SUCCESS)
 }
 
