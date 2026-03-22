@@ -9,16 +9,19 @@
 // Rules WTF-L001 through WTF-L006 — see individual rule modules.
 
 pub mod diagnostic;
+pub mod l001_time;
+pub mod l003_direct_io;
+pub mod l004;
 pub mod l005;
 pub mod l006;
 pub mod rules;
 pub mod visitor;
 
 pub use diagnostic::{Diagnostic, LintCode, LintError, Severity};
+pub use l004::lint_workflow_code as lint_workflow_code_l004;
 pub use l005::lint_workflow_code;
 pub use l006::lint_workflow_code as lint_workflow_code_l006;
-
-use std::collections::HashSet;
+pub use rules::check_random_in_workflow;
 
 pub struct LintResult {
     pub diagnostics: Vec<Diagnostic>,
@@ -42,23 +45,16 @@ impl LintResult {
 /// Returns `LintError::ParseError` if the source cannot be parsed.
 pub fn lint_workflow_source(source: &str) -> Result<LintResult, LintError> {
     let mut all_diagnostics: Vec<Diagnostic> = Vec::new();
-    let mut seen_codes: HashSet<String> = HashSet::new();
+
+    all_diagnostics.extend(l001_time::lint_workflow_code(source)?);
+    all_diagnostics.extend(l003_direct_io::lint_workflow_code(source)?);
+    all_diagnostics.extend(l004::lint_workflow_code(source)?);
 
     let l005_result = l005::lint_workflow_code(source)?;
-    for diag in l005_result {
-        let code_str = diag.code.to_string();
-        if seen_codes.insert(code_str.clone()) {
-            all_diagnostics.push(diag);
-        }
-    }
+    all_diagnostics.extend(l005_result);
 
     let l006_result = l006::lint_workflow_code(source)?;
-    for diag in l006_result {
-        let code_str = diag.code.to_string();
-        if seen_codes.insert(code_str.clone()) {
-            all_diagnostics.push(diag);
-        }
-    }
+    all_diagnostics.extend(l006_result);
 
     Ok(LintResult::new(all_diagnostics))
 }

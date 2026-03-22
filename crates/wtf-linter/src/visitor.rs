@@ -3,7 +3,7 @@
 #![deny(clippy::panic)]
 #![forbid(unsafe_code)]
 
-use syn::{spanned::Spanned, visit::Visit, Expr, ExprCall, ExprMethodCall, Path};
+use syn::{visit::Visit, Expr, ExprMethodCall, Path};
 
 use crate::diagnostic::{Diagnostic, LintCode};
 
@@ -55,15 +55,28 @@ impl DirectAsyncIoVisitor {
             || method == "delete"
             || method == "patch"
         {
-            if let Expr::Path(path_expr) = receiver.as_ref() {
-                let path = &path_expr.path;
-                return path.segments.len() == 2
-                    && path.segments[0].ident == "reqwest"
-                    && (path.segments[1].ident == "Client"
-                        || path.segments[1].ident == "blocking");
-            }
+            return self.expr_has_reqwest_client(receiver);
         }
         false
+    }
+
+    fn expr_has_reqwest_client(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::Path(path_expr) => {
+                let path = &path_expr.path;
+                path.segments.iter().any(|seg| seg.ident == "reqwest")
+            }
+            Expr::Call(call_expr) => {
+                if let Expr::Path(path_expr) = call_expr.func.as_ref() {
+                    let path = &path_expr.path;
+                    path.segments.iter().any(|seg| seg.ident == "reqwest")
+                } else {
+                    false
+                }
+            }
+            Expr::MethodCall(method_call) => self.expr_has_reqwest_client(&method_call.receiver),
+            _ => false,
+        }
     }
 
     fn is_sqlx_fetch_method(&self, method: &syn::Ident) -> bool {
@@ -85,9 +98,6 @@ impl DirectAsyncIoVisitor {
             Expr::Call(call_expr) => {
                 if let Expr::Path(path_expr) = call_expr.func.as_ref() {
                     if self.is_reqwest_get_call(&path_expr.path) {
-                        let span = loc_of(expr);
-                        self.emit_diagnostic(span);
-                    } else if self.is_sqlx_query_call(&path_expr.path) {
                         let span = loc_of(expr);
                         self.emit_diagnostic(span);
                     }
@@ -126,7 +136,7 @@ impl<'ast> Visit<'ast> for DirectAsyncIoVisitor {
     }
 }
 
-fn loc_of(expr: &Expr) -> Option<(usize, usize)> {
+fn loc_of(_expr: &Expr) -> Option<(usize, usize)> {
     None
 }
 

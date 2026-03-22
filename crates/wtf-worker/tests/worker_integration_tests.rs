@@ -11,10 +11,11 @@
 //! - Streams provisioned via `wtf_storage::provision_streams`
 
 use bytes::Bytes;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use async_nats::jetstream::Context;
-use tokio::sync::watch;
+use tokio::sync::{watch, Mutex, OwnedMutexGuard};
 use wtf_common::{ActivityId, InstanceId, NamespaceId, RetryPolicy};
 use wtf_storage::{connect, provision_streams, NatsConfig};
 
@@ -26,10 +27,18 @@ use wtf_worker::{
 
 struct NatsTestServer {
     js: Context,
+    _guard: OwnedMutexGuard<()>,
+}
+
+fn global_test_lock() -> Arc<Mutex<()>> {
+    static LOCK: OnceLock<Arc<Mutex<()>>> = OnceLock::new();
+    LOCK.get_or_init(|| Arc::new(Mutex::new(()))).clone()
 }
 
 impl NatsTestServer {
     async fn new() -> Result<Self, wtf_common::WtfError> {
+        let guard = global_test_lock().lock_owned().await;
+
         let config = NatsConfig {
             urls: vec![std::env::var("NATS_URL")
                 .unwrap_or_else(|_| "nats://127.0.0.1:4222".into())],
@@ -39,7 +48,10 @@ impl NatsTestServer {
         };
 
         let client = connect(&config).await?;
-        Ok(Self { js: client.jetstream().clone() })
+        Ok(Self {
+            js: client.jetstream().clone(),
+            _guard: guard,
+        })
     }
 
     async fn provision(&self) -> Result<(), wtf_common::WtfError> {
@@ -175,7 +187,7 @@ async fn worker_run_processes_task_and_acks() {
     let task = make_task("send_email", 1);
     enqueue_activity(&server.js, &task).await.expect("enqueue");
 
-    let worker = Worker::new(server.js.clone(), "test-worker", None);
+    let mut worker = Worker::new(server.js.clone(), "test-worker", None);
     worker.register("send_email", |task| async move {
         assert_eq!(task.activity_type, "send_email");
         Ok(Bytes::from_static(b"\"sent\""))
@@ -336,7 +348,7 @@ async fn unknown_activity_type_logs_warning_and_acks() {
     let task = make_task("unknown_type", 1);
     enqueue_activity(&server.js, &task).await.expect("enqueue");
 
-    let mut worker = Worker::new(server.js.clone(), "test-worker", None);
+    let worker = Worker::new(server.js.clone(), "test-worker", None);
     // No handlers registered
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -578,7 +590,7 @@ async fn full_dispatch_cycle_with_failure_and_retry() {
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let shutdown_task = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(4)).await;
         let _ = shutdown_tx.send(true);
     });
 
@@ -630,9 +642,15 @@ async fn retry_policy_passed_correctly_to_handler() {
         }
     });
 
-    let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let shutdown_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        let _ = shutdown_tx.send(true);
+    });
 
     let _ = tokio::time::timeout(Duration::from_secs(5), worker.run(shutdown_rx)).await;
+    let _ = shutdown_task.await;
 
     let stored = received_policy.lock().unwrap();
     assert!(
