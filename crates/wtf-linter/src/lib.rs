@@ -21,7 +21,6 @@ pub use diagnostic::{Diagnostic, LintCode, LintError, Severity};
 pub use l004::lint_workflow_code as lint_workflow_code_l004;
 pub use l005::lint_workflow_code;
 pub use l006::lint_workflow_code as lint_workflow_code_l006;
-pub use rules::check_random_in_workflow;
 
 pub struct LintResult {
     pub diagnostics: Vec<Diagnostic>,

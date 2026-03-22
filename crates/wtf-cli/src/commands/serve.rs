@@ -1,9 +1,9 @@
 //! `wtf serve` — run the wtf-engine server.
 //! Provision streams and buckets, then start the NATS JetStream context.
 
-use std::path::PathBuf;
 use anyhow::Context;
-use wtf_storage::{connect, NatsClient, NatsConfig, provision_streams, provision_kv_buckets};
+use std::path::PathBuf;
+use wtf_storage::{connect, provision_kv_buckets, provision_streams, NatsClient, NatsConfig};
 
 /// Configuration for the `serve` command.
 #[derive(Debug, Clone)]
@@ -30,7 +30,7 @@ impl From<ServeConfig> for NatsConfig {
 /// Establishes NATS connection, provisions storage, and returns the NATS client.
 pub async fn run_serve(config: ServeConfig) -> anyhow::Result<NatsClient> {
     let nats_config = NatsConfig::from(config);
-    
+
     let nats = connect(&nats_config)
         .await
         .context("failed to connect to NATS")?;

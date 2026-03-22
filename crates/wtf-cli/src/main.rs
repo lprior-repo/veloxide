@@ -156,5 +156,7 @@ async fn handle_lint(
 
 async fn handle_admin(cmd: AdminCommands) -> anyhow::Result<std::process::ExitCode> {
     let config = RebuildViewsConfig::from(&cmd);
-    run_rebuild_views(config).await.context("rebuild-views command failed")
+    run_rebuild_views(config)
+        .await
+        .context("rebuild-views command failed")
 }
