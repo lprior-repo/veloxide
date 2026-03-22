@@ -8,6 +8,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use wtf_linter::diagnostic::LintError;
+use wtf_linter::lint_workflow_code;
 use wtf_linter::Diagnostic;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -63,42 +64,105 @@ pub enum LintCommandError {
     NoFilesFound,
 }
 
-pub fn run_lint(paths: &[PathBuf], format: OutputFormat) -> Result<ExitCode, LintCommandError> {
-    let all_diagnostics = collect_diagnostics(paths)?;
-    let exit_code = if all_diagnostics.is_empty() {
+const RULE_EXPLANATIONS: &[(&str, &str)] = &[
+    (
+        "WTF-L001",
+        "Non-deterministic time call detected. \
+        Workflow functions must produce identical results on every replay. \
+        Use `ctx.now()` instead of `std::time::SystemTime::now()`, \
+        `chrono::Utc::now()`, or `chrono::Local::now()`.",
+    ),
+    (
+        "WTF-L002",
+        "Non-deterministic random call detected. \
+        Workflow functions must produce identical results on every replay. \
+        Use `ctx.random_u64()` instead of `rand::random()`, \
+        `rand::thread_rng()`, or `uuid::Uuid::new_v4()`.",
+    ),
+    (
+        "WTF-L003",
+        "Direct async I/O detected. \
+        Workflow functions must not perform direct async I/O. \
+        Wrap I/O operations in `ctx.activity(\"name\", input)` instead.",
+    ),
+    (
+        "WTF-L004",
+        "ctx.* call inside closure with non-deterministic dispatch order. \
+        Closures passed to `.map()`, `.for_each()`, `.fold()`, or `.filter_map()` \
+        may execute in any order. Use `ctx.parallel()` or sequential iteration.",
+    ),
+    (
+        "WTF-L005",
+        "tokio::spawn detected. \
+        `tokio::spawn` creates untracked async work that is not logged. \
+        Use `ctx.activity()` to ensure the result is logged and replayable.",
+    ),
+    (
+        "WTF-L006",
+        "std::thread::spawn detected. \
+        Thread spawn is not replayable. \
+        Use `ctx.activity()` instead.",
+    ),
+];
+
+pub fn explain_rule(rule_code: &str) -> Option<String> {
+    RULE_EXPLANATIONS
+        .iter()
+        .find(|(code, _)| *code == rule_code)
+        .map(|(_, explanation)| explanation.to_string())
+}
+
+pub fn run_lint(
+    paths: &[PathBuf],
+    format: OutputFormat,
+    check: bool,
+) -> Result<ExitCode, LintCommandError> {
+    let file_diags = collect_diagnostics(paths)?;
+    let total_diagnostics: usize = file_diags.iter().map(|(_, d)| d.len()).sum();
+    let exit_code = if total_diagnostics == 0 {
         ExitCode::SUCCESS
     } else {
         ExitCode::from(1)
     };
-    emit_diagnostics(&all_diagnostics, format);
+    if !check {
+        for (path, diags) in &file_diags {
+            emit_diagnostics(diags, format, path);
+        }
+    }
     Ok(exit_code)
 }
 
-fn collect_diagnostics(paths: &[PathBuf]) -> Result<Vec<Diagnostic>, LintCommandError> {
-    let mut all_diagnostics = Vec::new();
+fn collect_diagnostics(
+    paths: &[PathBuf],
+) -> Result<Vec<(PathBuf, Vec<Diagnostic>)>, LintCommandError> {
+    let mut all_file_diags = Vec::new();
     let mut had_parse_error = false;
     for path in paths {
-        let results = if path.is_dir() {
-            collect_from_directory(path)?
+        if path.is_dir() {
+            for file_diag in collect_from_directory(path)? {
+                match file_diag {
+                    Ok((p, diags)) => {
+                        all_file_diags.push((p, diags));
+                    }
+                    Err(LintError::ParseError(_)) => had_parse_error = true,
+                }
+            }
         } else {
-            vec![lint_single_file(path)]
-        };
-        for result in results {
-            match result {
-                Ok(diagnostics) => all_diagnostics.extend(diagnostics),
+            match lint_single_file(path) {
+                Ok(diags) => all_file_diags.push((path.clone(), diags)),
                 Err(LintError::ParseError(_)) => had_parse_error = true,
             }
         }
     }
-    if all_diagnostics.is_empty() && had_parse_error {
+    if all_file_diags.is_empty() && had_parse_error {
         return Ok(vec![]);
     }
-    Ok(all_diagnostics)
+    Ok(all_file_diags)
 }
 
 fn collect_from_directory(
     dir: &Path,
-) -> Result<Vec<Result<Vec<Diagnostic>, LintError>>, LintCommandError> {
+) -> Result<Vec<Result<(PathBuf, Vec<Diagnostic>), LintError>>, LintCommandError> {
     let mut results = Vec::new();
     let entries = std::fs::read_dir(dir)?;
     for entry in entries {
@@ -107,7 +171,7 @@ fn collect_from_directory(
         if path.is_dir() {
             results.extend(collect_from_directory(&path)?);
         } else if is_rust_file(&path) {
-            results.push(lint_single_file(&path));
+            results.push(lint_single_file(&path).map(|diags| (path, diags)));
         }
     }
     Ok(results)
@@ -117,9 +181,9 @@ fn lint_single_file(path: &Path) -> Result<Vec<Diagnostic>, LintError> {
     if !is_rust_file(path) {
         return Ok(vec![]);
     }
-    let _content =
+    let content =
         std::fs::read_to_string(path).map_err(|e| LintError::ParseError(e.to_string()))?;
-    Ok(vec![])
+    wtf_linter::lint_workflow_code(&content)
 }
 
 fn is_rust_file(path: &Path) -> bool {
@@ -129,17 +193,43 @@ fn is_rust_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn emit_diagnostics(diagnostics: &[Diagnostic], format: OutputFormat) {
+fn emit_diagnostics(diagnostics: &[Diagnostic], format: OutputFormat, file_path: &Path) {
     match format {
-        OutputFormat::Human => emit_human(diagnostics),
+        OutputFormat::Human => emit_human(diagnostics, file_path),
         OutputFormat::Json => emit_json(diagnostics),
     }
 }
 
-fn emit_human(diagnostics: &[Diagnostic]) {
+fn emit_human(diagnostics: &[Diagnostic], file_path: &Path) {
     for d in diagnostics {
-        eprintln!("{d}");
+        let location = if let Some((start, _)) = d.span {
+            let line_col = line_col_from_offset(file_path, start);
+            format!("{}:{}:{}", file_path.display(), line_col.0, line_col.1)
+        } else {
+            format!("{}:1:1", file_path.display())
+        };
+        eprintln!("{} {}WTF-{:?}: {}", location, d.severity, d.code, d.message);
     }
+}
+
+fn line_col_from_offset(path: &Path, byte_offset: usize) -> (usize, usize) {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return (1, 1);
+    };
+    let mut line = 1;
+    let mut col = 1;
+    for (i, byte) in content.bytes().enumerate() {
+        if i == byte_offset {
+            return (line, col);
+        }
+        if byte == b'\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
 }
 
 fn emit_json(diagnostics: &[Diagnostic]) {

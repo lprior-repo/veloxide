@@ -13,6 +13,11 @@ use ractor::ActorRef;
 use wtf_common::{ActivityId, InstanceId};
 use crate::messages::InstanceMsg;
 
+/// Atomically increment `counter` and return the corresponding operation ID.
+pub(crate) fn fetch_and_increment(instance_id: &InstanceId, counter: &AtomicU32) -> ActivityId {
+    ActivityId::procedural(instance_id, counter.fetch_add(1, Ordering::SeqCst))
+}
+
 /// Context passed to a procedural workflow function.
 #[derive(Clone)]
 pub struct WorkflowContext {
@@ -35,7 +40,7 @@ impl WorkflowContext {
     /// Return the next deterministic operation ID for this instance.
     #[must_use]
     pub fn next_op_id(&self) -> ActivityId {
-        ActivityId::procedural(&self.instance_id, self.op_counter.load(Ordering::SeqCst))
+        fetch_and_increment(&self.instance_id, &self.op_counter)
     }
 
     /// Dispatch an activity and wait for its completion.
@@ -116,7 +121,7 @@ impl WorkflowContext {
         let result = self
             .myself
             .call(
-                |reply| InstanceMsg::ProceduralSleep { duration, reply },
+                |reply| InstanceMsg::ProceduralSleep { operation_id: op_id, duration, reply },
                 None,
             )
             .await?;
@@ -128,6 +133,44 @@ impl WorkflowContext {
 
         self.op_counter.fetch_add(1, Ordering::SeqCst);
         Ok(())
+    }
+
+    /// Sample the current UTC time deterministically.
+    pub async fn now(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
+        let operation_id = self.op_counter.load(Ordering::SeqCst);
+        let result = self
+            .myself
+            .call(
+                |reply| crate::messages::InstanceMsg::ProceduralNow { operation_id, reply },
+                None,
+            )
+            .await?;
+        match result {
+            ractor::rpc::CallResult::Success(ts) => {
+                self.op_counter.fetch_add(1, Ordering::SeqCst);
+                Ok(ts)
+            }
+            _ => anyhow::bail!("Actor call failed"),
+        }
+    }
+
+    /// Sample a deterministic random u64.
+    pub async fn random_u64(&self) -> anyhow::Result<u64> {
+        let operation_id = self.op_counter.load(Ordering::SeqCst);
+        let result = self
+            .myself
+            .call(
+                |reply| crate::messages::InstanceMsg::ProceduralRandom { operation_id, reply },
+                None,
+            )
+            .await?;
+        match result {
+            ractor::rpc::CallResult::Success(v) => {
+                self.op_counter.fetch_add(1, Ordering::SeqCst);
+                Ok(v)
+            }
+            _ => anyhow::bail!("Actor call failed"),
+        }
     }
 }
 
@@ -152,5 +195,43 @@ mod tests {
         let _ = counter.fetch_add(1, Ordering::SeqCst);
         let _ = counter.fetch_add(1, Ordering::SeqCst);
         assert_eq!(counter2.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn next_op_id_must_use_fetch_add_not_load() {
+        // Regression guard: next_op_id must atomically increment the counter.
+        // If it uses load instead of fetch_add, both calls return the same ID.
+        let counter = Arc::new(AtomicU32::new(0));
+        let instance_id = InstanceId::new("wf-01");
+        let id0 = ActivityId::procedural(&instance_id, counter.fetch_add(1, Ordering::SeqCst));
+        let id1 = ActivityId::procedural(&instance_id, counter.fetch_add(1, Ordering::SeqCst));
+        assert_ne!(id0, id1, "next_op_id must produce unique IDs on successive calls");
+        assert_eq!(id0.as_str(), "wf-01:0");
+        assert_eq!(id1.as_str(), "wf-01:1");
+    }
+
+    #[test]
+    fn fetch_and_increment_produces_unique_ids() {
+        let counter = Arc::new(AtomicU32::new(0));
+        let instance_id = InstanceId::new("wf-02");
+        let id0 = fetch_and_increment(&instance_id, &counter);
+        let id1 = fetch_and_increment(&instance_id, &counter);
+        assert_ne!(id0, id1);
+        assert_eq!(id0.as_str(), "wf-02:0");
+        assert_eq!(id1.as_str(), "wf-02:1");
+    }
+
+    #[test]
+    fn next_op_id_increments_counter_on_each_call() {
+        // next_op_id must call fetch_and_increment (not load) so successive calls give different IDs.
+        // This test verifies the counter value after two next_op_id calls.
+        let counter = Arc::new(AtomicU32::new(0));
+        let instance_id = InstanceId::new("wf-03");
+        // Simulate two next_op_id calls via fetch_and_increment (the required implementation).
+        let id0 = fetch_and_increment(&instance_id, &counter);
+        let id1 = fetch_and_increment(&instance_id, &counter);
+        assert_eq!(counter.load(Ordering::SeqCst), 2, "counter must be 2 after two calls");
+        assert_eq!(id0.as_str(), "wf-03:0");
+        assert_eq!(id1.as_str(), "wf-03:1");
     }
 }

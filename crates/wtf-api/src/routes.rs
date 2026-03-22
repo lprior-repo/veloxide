@@ -1,25 +1,32 @@
 //! routes.rs - HTTP routes for wtf-api
 
 use axum::{
-    routing::{delete, get},
+    extract::Extension,
+    routing::{get, post},
     Router,
 };
 use ractor::ActorRef;
 use wtf_actor::OrchestratorMsg;
+use wtf_storage::kv::KvStores;
 
-use crate::handlers;
+use crate::{handlers, sse};
 
-pub fn create_routes(master: ActorRef<OrchestratorMsg>) -> Router {
+pub fn create_routes(master: ActorRef<OrchestratorMsg>, kv: KvStores) -> Router {
     Router::new()
-        .route("/workflows", get(handlers::list_workflows))
-        .route("/workflows/:invocation_id", get(handlers::get_workflow))
         .route(
-            "/workflows/:invocation_id",
-            delete(handlers::terminate_workflow),
+            "/workflows",
+            get(handlers::list_workflows).post(handlers::start_workflow),
         )
         .route(
-            "/workflows/:invocation_id/events",
-            get(handlers::get_events),
+            "/workflows/:id",
+            get(handlers::get_workflow).delete(handlers::terminate_workflow),
         )
-        .with_state(master)
+        .route("/workflows/:id/signals", post(handlers::send_signal))
+        .route("/workflows/:id/events", get(handlers::get_events))
+        .route("/instances/:id/replay-to/:seq", get(handlers::replay_to))
+        .route("/definitions/:type", post(handlers::ingest_definition))
+        .route("/watch", get(sse::watch_all))
+        .route("/watch/:namespace", get(sse::watch_namespace))
+        .layer(Extension(master))
+        .layer(Extension(kv))
 }

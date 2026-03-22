@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::{
     extract::Extension,
@@ -20,10 +21,12 @@ use axum::{
     Router,
 };
 use ractor::ActorRef;
+use tokio::sync::Semaphore;
 use tower_http::trace::TraceLayer;
 use wtf_actor::OrchestratorMsg;
+use wtf_storage::kv::KvStores;
 
-use crate::{handlers, health};
+use crate::{handlers, health, sse};
 
 /// Build the complete axum `Router` for wtf-api.
 ///
@@ -38,8 +41,13 @@ use crate::{handlers, health};
 /// - `DELETE /api/v1/workflows/:id` — terminate instance
 /// - `POST /api/v1/workflows/:id/signals` — send a signal
 /// - `GET /api/v1/workflows/:id/events` — stream event log
+/// - `POST /api/v1/definitions/:type` — ingest and lint workflow definition
+/// - `GET /api/v1/watch` — watch all workflow instances
+/// - `GET /api/v1/watch/:namespace` — watch instances in namespace
 #[must_use]
-pub fn build_app(master: ActorRef<OrchestratorMsg>) -> Router {
+pub fn build_app(master: ActorRef<OrchestratorMsg>, kv: KvStores) -> Router {
+    let sse_semaphore = Arc::new(Semaphore::new(sse::MAX_SSE_WATCHERS));
+
     let api_routes = Router::new()
         .route("/workflows", post(handlers::start_workflow))
         .route("/workflows", get(handlers::list_workflows))
@@ -47,7 +55,13 @@ pub fn build_app(master: ActorRef<OrchestratorMsg>) -> Router {
         .route("/workflows/:id", delete(handlers::terminate_workflow))
         .route("/workflows/:id/signals", post(handlers::send_signal))
         .route("/workflows/:id/events", get(handlers::get_events))
-        .layer(Extension(master));
+        .route("/instances/:id/replay-to/:seq", get(handlers::replay_to))
+        .route("/definitions/:type", post(handlers::ingest_definition))
+        .route("/watch", get(sse::watch_all))
+        .route("/watch/:namespace", get(sse::watch_namespace))
+        .layer(Extension(master))
+        .layer(Extension(sse_semaphore))
+        .layer(Extension(kv));
 
     Router::new()
         .route("/health", get(health::health_handler))

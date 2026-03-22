@@ -1,8 +1,4 @@
 //! wtf-storage — NATS JetStream event log, NATS KV materialized view, sled snapshot cache.
-//!
-//! Source of truth: NATS JetStream (ADR-013).
-//! Query side: NATS KV (ADR-014).
-//! Snapshot cache: sled, single `snapshots` tree (ADR-019).
 
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
@@ -13,13 +9,11 @@
 pub mod journal;
 pub mod kv;
 pub mod nats;
-pub mod provision;
 pub mod replay;
-pub mod snapshots;
-
-// Legacy sled modules — kept for reference, migrated to above modules.
-pub mod db;
 pub mod instances;
+pub mod snapshots;
+pub mod provision;
+pub mod db;
 pub mod signals;
 pub mod timers;
 
@@ -31,9 +25,102 @@ pub use kv::{
 pub use nats::{connect, NatsClient, NatsConfig};
 pub use provision::{provision_streams, stream_names, subjects, verify_streams};
 pub use replay::{
-    create_replay_consumer, replay_start_seq, ReplayBatch, ReplayConfig, ReplayConsumer,
-    ReplayedEvent,
+    create_replay_consumer, replay_events, replay_start_seq, ReplayConfig,
+    ReplayConsumer,
 };
+pub use wtf_common::storage::{ReplayBatch, ReplayedEvent};
 pub use snapshots::{
     delete_snapshot, open_snapshot_db, read_snapshot, write_snapshot, SnapshotRecord,
 };
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use wtf_common::storage::{EventStore, ReplayStream, StateStore, TaskQueue};
+use wtf_common::{InstanceId, NamespaceId, WorkflowEvent, WtfError, InstanceMetadata};
+
+#[async_trait]
+impl EventStore for NatsClient {
+    async fn publish(
+        &self,
+        ns: &NamespaceId,
+        inst: &InstanceId,
+        event: WorkflowEvent,
+    ) -> Result<u64, WtfError> {
+        journal::append_event(&self.jetstream, ns, inst, &event).await
+    }
+
+    async fn open_replay_stream(
+        &self,
+        ns: &NamespaceId,
+        inst: &InstanceId,
+        from_seq: u64,
+    ) -> Result<Box<dyn ReplayStream>, WtfError> {
+        let config = ReplayConfig {
+            from_seq,
+            ..Default::default()
+        };
+        let consumer = create_replay_consumer(&self.jetstream, ns, inst, &config).await?;
+        Ok(Box::new(consumer))
+    }
+}
+
+#[async_trait]
+impl StateStore for NatsClient {
+    async fn put_instance_metadata(&self, metadata: InstanceMetadata) -> Result<(), WtfError> {
+        let kv = self.jetstream.get_key_value(bucket_names::INSTANCES).await
+            .map_err(|e| WtfError::nats_publish(format!("get instances KV: {e}")))?;
+            
+        let json = serde_json::to_vec(&metadata)
+            .map_err(|e| WtfError::nats_publish(format!("serialize metadata: {e}")))?;
+            
+        let key = instance_key(metadata.namespace.as_str(), &metadata.instance_id);
+        kv.put(&key, json.into()).await
+            .map_err(|e| WtfError::nats_publish(format!("put metadata: {e}")))?;
+            
+        Ok(())
+    }
+
+    async fn get_instance_metadata(&self, instance_id: &InstanceId) -> Result<Option<InstanceMetadata>, WtfError> {
+        let kv = self.jetstream.get_key_value(bucket_names::INSTANCES).await
+            .map_err(|e| WtfError::nats_publish(format!("get instances KV: {e}")))?;
+            
+        let key = instance_key("", instance_id);
+        let entry = kv.get(&key).await.ok().flatten();
+        
+        if let Some(e) = entry {
+            return Ok(serde_json::from_slice(&e).ok());
+        }
+        
+        Ok(None)
+    }
+
+    async fn put_heartbeat(&self, node_id: &str, instance_id: &InstanceId) -> Result<(), WtfError> {
+        let kv = self.jetstream.get_key_value(bucket_names::HEARTBEATS).await
+            .map_err(|e| WtfError::nats_publish(format!("get heartbeats KV: {e}")))?;
+            
+        kv.put(&heartbeat_key(instance_id), node_id.as_bytes().to_vec().into()).await
+            .map_err(|e| WtfError::nats_publish(format!("put heartbeat: {e}")))?;
+            
+        Ok(())
+    }
+
+    async fn put_timer(&self, timer_id: &str, payload: Bytes) -> Result<(), WtfError> {
+        let kv = self.jetstream.get_key_value(bucket_names::TIMERS).await
+            .map_err(|e| WtfError::nats_publish(format!("get timers KV: {e}")))?;
+            
+        kv.put(timer_id, payload).await
+            .map_err(|e| WtfError::nats_publish(format!("put timer {timer_id}: {e}")))?;
+            
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl TaskQueue for NatsClient {
+    async fn dispatch(&self, activity_type: &str, payload: Bytes) -> Result<(), WtfError> {
+        let subject = format!("wtf.work.{}", activity_type);
+        self.jetstream.publish(subject, payload).await
+            .map_err(|e| WtfError::nats_publish(format!("dispatch task failed: {e}")))?;
+        Ok(())
+    }
+}

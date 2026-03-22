@@ -1,10 +1,11 @@
 //! In-memory state of a running WorkflowInstance.
 
 use super::lifecycle::ParadigmState;
-use crate::messages::{InstanceArguments, InstancePhase, WorkflowParadigm};
+use crate::messages::{InstanceArguments, InstancePhase};
 use bytes::Bytes;
 use ractor::RpcReplyPort;
 use std::collections::HashMap;
+use wtf_common::WorkflowParadigm;
 use wtf_common::{ActivityId, WtfError};
 
 /// In-memory state of a running WorkflowInstance.
@@ -31,6 +32,9 @@ pub struct InstanceState {
 
     /// Join handle for the procedural workflow task.
     pub procedural_task: Option<tokio::task::JoinHandle<()>>,
+
+    /// Join handle for the live subscription task.
+    pub live_subscription_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl InstanceState {
@@ -47,6 +51,7 @@ impl InstanceState {
             pending_activity_calls: HashMap::new(),
             pending_timer_calls: HashMap::new(),
             procedural_task: None,
+            live_subscription_task: None,
         }
     }
 }

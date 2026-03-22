@@ -6,40 +6,17 @@
 #![warn(clippy::pedantic)]
 #![forbid(unsafe_code)]
 
-use ractor::ActorProcessingErr;
-use wtf_common::WorkflowEvent;
-
 pub mod actor;
+pub mod handlers;
+pub mod init;
 pub mod lifecycle;
 pub mod procedural;
+pub mod procedural_utils;
 pub mod state;
 
 pub use self::actor::WorkflowInstance;
 pub use self::state::InstanceState;
-
-/// Write a snapshot every 100 events (ADR-019).
-pub const SNAPSHOT_INTERVAL: u32 = 100;
-
-/// Shared helper to update event counters and trigger snapshots.
-pub async fn handle_inject_event(
-    state: &mut InstanceState,
-    _seq: u64,
-    _event: &WorkflowEvent,
-) -> Result<(), ActorProcessingErr> {
-    state.total_events_applied += 1;
-    state.events_since_snapshot += 1;
-
-    if state.events_since_snapshot >= SNAPSHOT_INTERVAL {
-        tracing::debug!(
-            instance_id = %state.args.instance_id,
-            total = state.total_events_applied,
-            "snapshot trigger (stub — see wtf-flbh)"
-        );
-        state.events_since_snapshot = 0;
-    }
-
-    Ok(())
-}
+pub use self::handlers::SNAPSHOT_INTERVAL;
 
 #[cfg(test)]
 mod tests {
@@ -55,14 +32,18 @@ mod tests {
             paradigm,
             input: bytes::Bytes::from_static(b"{}"),
             engine_node_id: "node-1".into(),
-            nats: None,
+            event_store: None,
+            state_store: None,
+            task_queue: None,
             procedural_workflow: None,
+            snapshot_db: None,
+            workflow_definition: None,
         }
     }
 
     #[test]
     fn snapshot_interval_is_100() {
-        assert_eq!(SNAPSHOT_INTERVAL, 100);
+        assert_eq!(handlers::SNAPSHOT_INTERVAL, 100);
     }
 
     #[tokio::test]
@@ -77,12 +58,13 @@ mod tests {
             pending_activity_calls: HashMap::new(),
             pending_timer_calls: HashMap::new(),
             procedural_task: None,
+            live_subscription_task: None,
         };
-        let event = WorkflowEvent::SnapshotTaken {
+        let event = wtf_common::WorkflowEvent::SnapshotTaken {
             seq: 1,
             checksum: 0,
         };
-        handle_inject_event(&mut state, 1, &event)
+        handlers::inject_event(&mut state, 1, &event)
             .await
             .expect("ok");
         assert_eq!(state.total_events_applied, 1);
@@ -97,16 +79,17 @@ mod tests {
             args,
             phase: InstancePhase::Live,
             total_events_applied: 0,
-            events_since_snapshot: SNAPSHOT_INTERVAL - 1,
+            events_since_snapshot: handlers::SNAPSHOT_INTERVAL - 1,
             pending_activity_calls: HashMap::new(),
             pending_timer_calls: HashMap::new(),
             procedural_task: None,
+            live_subscription_task: None,
         };
-        let event = WorkflowEvent::SnapshotTaken {
+        let event = wtf_common::WorkflowEvent::SnapshotTaken {
             seq: 1,
             checksum: 0,
         };
-        handle_inject_event(&mut state, 1, &event)
+        handlers::inject_event(&mut state, 1, &event)
             .await
             .expect("ok");
         assert_eq!(state.events_since_snapshot, 0);

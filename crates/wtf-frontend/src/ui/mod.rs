@@ -16,6 +16,7 @@ pub mod inline_config_panel;
 pub mod inspector_panel;
 pub mod interaction_guards;
 pub mod minimap;
+pub mod monitor_mode;
 pub mod node;
 pub mod parallel_group_overlay;
 pub mod payload_preview_panel;
@@ -23,6 +24,7 @@ pub mod prototype_palette;
 pub mod run_status_bar;
 pub mod selected_node_panel;
 pub mod sidebar;
+pub mod time_travel;
 pub mod toolbar;
 pub mod validation_panel;
 
@@ -42,6 +44,7 @@ pub use expression_input::{ExpressionInput, NodeInfo};
 pub use inline_config_panel::InlineConfigPanel;
 pub use inspector_panel::InspectorPanel;
 pub use minimap::FlowMinimap;
+pub use monitor_mode::TimeTravelScrubber;
 pub use node::FlowNodeComponent;
 pub use parallel_group_overlay::ParallelGroupOverlay;
 pub use payload_preview_panel::PayloadPreviewPanel;
@@ -49,5 +52,9 @@ pub use prototype_palette::PrototypePalette;
 pub use run_status_bar::RunStatusBar;
 pub use selected_node_panel::SelectedNodePanel;
 pub use sidebar::NodeSidebar;
+pub use time_travel::{
+    clamp_step_index, next_step, prev_step, validate_step_index, DiffEntry, OrderedStep,
+    StateDiff, StepIndex, TimeTravelError,
+};
 pub use toolbar::FlowToolbar;
 pub use validation_panel::ValidationPanel;

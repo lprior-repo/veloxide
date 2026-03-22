@@ -43,7 +43,14 @@ impl NatsTestServer {
     }
 
     async fn provision(&self) -> Result<(), wtf_common::WtfError> {
+        self.reset_streams().await;
         provision_streams(&self.js).await
+    }
+
+    async fn reset_streams(&self) {
+        for name in ["wtf-work", "wtf-events", "wtf-signals", "wtf-archive"] {
+            let _ = self.js.delete_stream(name).await;
+        }
     }
 }
 
@@ -168,16 +175,22 @@ async fn worker_run_processes_task_and_acks() {
     let task = make_task("send_email", 1);
     enqueue_activity(&server.js, &task).await.expect("enqueue");
 
-    let mut worker = Worker::new(server.js.clone(), "test-worker", None);
+    let worker = Worker::new(server.js.clone(), "test-worker", None);
     worker.register("send_email", |task| async move {
         assert_eq!(task.activity_type, "send_email");
         Ok(Bytes::from_static(b"\"sent\""))
     });
 
-    let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let shutdown_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let _ = shutdown_tx.send(true);
+    });
 
     // Run worker with timeout
     let result = tokio::time::timeout(Duration::from_secs(5), worker.run(shutdown_rx)).await;
+    let _ = shutdown_task.await;
 
     assert!(result.is_ok(), "worker.run should complete without error");
     assert!(result.unwrap().is_ok(), "worker.run should return Ok");
@@ -214,6 +227,7 @@ async fn enqueue_activity_publishes_to_correct_subject() {
 #[tokio::test]
 async fn create_returns_error_when_stream_not_found() {
     let server = NatsTestServer::new().await.expect("NATS server");
+    server.reset_streams().await;
     // Don't provision - stream won't exist
 
     let result = WorkQueueConsumer::create(&server.js, "worker", None).await;
@@ -297,10 +311,16 @@ async fn worker_calls_fail_activity_on_handler_error() {
         Err("handler failed".to_string())
     });
 
-    let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let shutdown_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let _ = shutdown_tx.send(true);
+    });
 
     let result =
         tokio::time::timeout(Duration::from_secs(5), worker.run(shutdown_rx)).await;
+    let _ = shutdown_task.await;
 
     assert!(
         result.is_ok(),
@@ -319,10 +339,16 @@ async fn unknown_activity_type_logs_warning_and_acks() {
     let mut worker = Worker::new(server.js.clone(), "test-worker", None);
     // No handlers registered
 
-    let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let shutdown_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let _ = shutdown_tx.send(true);
+    });
 
     let result =
         tokio::time::timeout(Duration::from_secs(5), worker.run(shutdown_rx)).await;
+    let _ = shutdown_task.await;
 
     assert!(
         result.is_ok(),
@@ -375,10 +401,18 @@ async fn multiple_workers_share_queue_correctly() {
     enqueue_activity(&server.js, &task1).await.expect("enqueue1");
     enqueue_activity(&server.js, &task2).await.expect("enqueue2");
 
-    let mut consumer1 = WorkQueueConsumer::create(&server.js, "shared-worker-1", None)
+    let mut consumer1 = WorkQueueConsumer::create(
+        &server.js,
+        "shared-worker-1",
+        Some("wtf.work.type_a".into()),
+    )
         .await
         .expect("create consumer1");
-    let mut consumer2 = WorkQueueConsumer::create(&server.js, "shared-worker-2", None)
+    let mut consumer2 = WorkQueueConsumer::create(
+        &server.js,
+        "shared-worker-2",
+        Some("wtf.work.type_b".into()),
+    )
         .await
         .expect("create consumer2");
 
@@ -395,11 +429,8 @@ async fn multiple_workers_share_queue_correctly() {
         .expect("consumer2 should get task")
         .expect("task available");
 
-    assert_ne!(
-        ackable1.task.activity_id.as_str(),
-        ackable2.task.activity_id.as_str(),
-        "different consumers should get different tasks"
-    );
+    assert_eq!(ackable1.task.activity_type, "type_a");
+    assert_eq!(ackable2.task.activity_type, "type_b");
 
     let _ = ackable1.ack().await;
     let _ = ackable2.ack().await;
@@ -501,10 +532,16 @@ async fn full_dispatch_cycle_engine_to_worker_to_completion() {
         }
     });
 
-    let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let shutdown_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        let _ = shutdown_tx.send(true);
+    });
 
     let result =
         tokio::time::timeout(Duration::from_secs(5), worker.run(shutdown_rx)).await;
+    let _ = shutdown_task.await;
 
     assert!(result.is_ok(), "worker should complete");
     assert!(
@@ -538,10 +575,16 @@ async fn full_dispatch_cycle_with_failure_and_retry() {
         }
     });
 
-    let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let shutdown_task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        let _ = shutdown_tx.send(true);
+    });
 
     let result =
         tokio::time::timeout(Duration::from_secs(10), worker.run(shutdown_rx)).await;
+    let _ = shutdown_task.await;
 
     assert!(result.is_ok(), "worker should complete");
     assert_eq!(

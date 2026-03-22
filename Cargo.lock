@@ -5198,6 +5198,7 @@ name = "wtf-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-nats",
  "axum 0.7.9",
  "bytes",
  "chrono",
@@ -5207,8 +5208,10 @@ dependencies = [
  "reqwest 0.11.27",
  "serde",
  "serde_json",
+ "sled",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-stream",
  "tower 0.4.13",
  "tower-http 0.5.2",
  "tracing",
@@ -5217,6 +5220,7 @@ dependencies = [
  "wtf-actor",
  "wtf-common",
  "wtf-core",
+ "wtf-linter",
  "wtf-storage",
  "wtf-worker",
 ]
@@ -5248,6 +5252,7 @@ dependencies = [
 name = "wtf-common"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "chrono",
  "rmp-serde",
@@ -5304,6 +5309,7 @@ name = "wtf-linter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "proc-macro2",
  "quote",
  "rstest",
  "syn",
@@ -5316,6 +5322,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-nats",
+ "async-trait",
  "bytes",
  "chrono",
  "crc32fast",

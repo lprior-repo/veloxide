@@ -17,10 +17,10 @@
 #![forbid(unsafe_code)]
 
 use bytes::Bytes;
-use wtf_common::{InstanceId, NamespaceId, WorkflowEvent, WtfError};
-use wtf_storage::{append_event, write_snapshot, SnapshotRecord};
+use wtf_common::{InstanceId, NamespaceId, WorkflowEvent, WtfError, EventStore};
+use wtf_storage::snapshots::{write_snapshot, SnapshotRecord};
 
-use crate::instance::SNAPSHOT_INTERVAL;
+use crate::instance::handlers::SNAPSHOT_INTERVAL;
 
 /// The result of a successful snapshot write.
 #[derive(Debug, Clone)]
@@ -34,7 +34,7 @@ pub struct SnapshotResult {
 /// Write a snapshot for a workflow instance.
 ///
 /// # Arguments
-/// - `js`: JetStream context for appending `SnapshotTaken`.
+/// - `event_store`: EventStore for appending `SnapshotTaken`.
 /// - `db`: sled database for writing the `SnapshotRecord`.
 /// - `namespace`: instance namespace.
 /// - `instance_id`: instance being snapshotted.
@@ -45,47 +45,61 @@ pub struct SnapshotResult {
 /// - `WtfError::SledError` if sled write fails (non-fatal: caller falls back to full replay).
 /// - `WtfError::NatsPublish` if JetStream `SnapshotTaken` publish fails (non-fatal).
 pub async fn write_instance_snapshot(
-    js: &async_nats::jetstream::Context,
+    event_store: &dyn EventStore,
     db: &sled::Db,
     namespace: &NamespaceId,
     instance_id: &InstanceId,
     last_applied_seq: u64,
     state_bytes: Bytes,
 ) -> Result<SnapshotResult, WtfError> {
-    // Step 1: Build SnapshotRecord (computes CRC32 checksum automatically).
     let record = SnapshotRecord::new(last_applied_seq, state_bytes);
     let checksum = record.checksum;
 
-    // Step 2: Write to sled (local snapshot cache).
-    // Non-fatal: if sled fails, we publish SnapshotTaken anyway (recovery will full-replay).
-    if let Err(e) = write_snapshot(db, instance_id, &record) {
+    persist_local_snapshot(db, instance_id, &record);
+
+    let jetstream_seq =
+        publish_snapshot_event(event_store, namespace, instance_id, last_applied_seq, checksum)
+            .await?;
+
+    Ok(SnapshotResult {
+        jetstream_seq,
+        checksum,
+    })
+}
+
+fn persist_local_snapshot(db: &sled::Db, instance_id: &InstanceId, record: &SnapshotRecord) {
+    if let Err(e) = write_snapshot(db, instance_id, record) {
         tracing::warn!(
             instance_id = %instance_id,
             error = %e,
             "sled snapshot write failed — SnapshotTaken still published; recovery will replay from start"
         );
     }
+}
 
-    // Step 3: Append SnapshotTaken to JetStream (write-ahead — ADR-015).
+async fn publish_snapshot_event(
+    event_store: &dyn EventStore,
+    namespace: &NamespaceId,
+    instance_id: &InstanceId,
+    last_applied_seq: u64,
+    checksum: u32,
+) -> Result<u64, WtfError> {
     let event = WorkflowEvent::SnapshotTaken {
         seq: last_applied_seq,
         checksum,
     };
 
-    let jetstream_seq = append_event(js, namespace, instance_id, &event).await?;
+    let seq = event_store.publish(namespace, instance_id, event).await?;
 
     tracing::debug!(
         instance_id = %instance_id,
         last_applied_seq,
-        jetstream_seq,
+        jetstream_seq = seq,
         checksum,
         "snapshot written"
     );
 
-    Ok(SnapshotResult {
-        jetstream_seq,
-        checksum,
-    })
+    Ok(seq)
 }
 
 /// Check whether a snapshot should be triggered.

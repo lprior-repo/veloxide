@@ -135,6 +135,25 @@ pub struct WorkQueueConsumer {
 }
 
 impl WorkQueueConsumer {
+    fn durable_for(filter_subject: &Option<String>, worker_name: &str) -> String {
+        let name = filter_subject
+            .as_ref()
+            .map(|subject| {
+                let stable = subject
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                    .collect::<String>();
+                format!("work_{stable}")
+            })
+            .unwrap_or_else(|| "work_all".to_owned());
+
+        if name.is_empty() {
+            worker_name.to_owned()
+        } else {
+            name
+        }
+    }
+
     /// Create a durable pull consumer on `wtf-work` for the given worker name.
     ///
     /// If a consumer with `worker_name` already exists it is reused (idempotent).
@@ -148,8 +167,9 @@ impl WorkQueueConsumer {
         worker_name: &str,
         filter_subject: Option<String>,
     ) -> Result<Self, WtfError> {
+        let durable_name = Self::durable_for(&filter_subject, worker_name);
         let config = pull::Config {
-            durable_name: Some(worker_name.to_owned()),
+            durable_name: Some(durable_name.clone()),
             filter_subject: filter_subject.unwrap_or_else(|| format!("{WORK_SUBJECT_PREFIX}.>")),
             ..pull::Config::default()
         };
@@ -160,7 +180,7 @@ impl WorkQueueConsumer {
             .map_err(|e| WtfError::nats_publish(format!("get stream {WORK_STREAM_NAME}: {e}")))?;
 
         let consumer = stream
-            .get_or_create_consumer::<pull::Config>(worker_name, config)
+            .get_or_create_consumer::<pull::Config>(&durable_name, config)
             .await
             .map_err(|e| WtfError::nats_publish(format!("get/create consumer: {e}")))?;
 

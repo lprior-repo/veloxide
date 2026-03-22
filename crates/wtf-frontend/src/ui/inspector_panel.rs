@@ -5,9 +5,11 @@
 #![warn(clippy::nursery)]
 #![forbid(unsafe_code)]
 
-use crate::ui::panel_types::{CollapseState, InvocationStatus, invocation_badge_style, chevron_rotation_class};
+use crate::graph::{ExecutionState, Node};
+use crate::ui::panel_types::{
+    chevron_rotation_class, invocation_badge_style, CollapseState, InvocationStatus,
+};
 use dioxus::prelude::*;
-use oya_frontend::graph::{ExecutionState, Node};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InspectorTab {
@@ -323,7 +325,7 @@ mod tests {
         execution_state_label, filter_lines, format_duration, should_render_failure,
         status_badge_class,
     };
-    use oya_frontend::graph::ExecutionState;
+    use crate::graph::ExecutionState;
 
     #[test]
     fn given_idle_state_when_getting_badge_class_then_returns_slate() {
