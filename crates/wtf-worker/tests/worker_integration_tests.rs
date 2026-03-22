@@ -75,6 +75,7 @@ fn make_task(activity_type: &str, attempt: u32) -> ActivityTask {
         instance_id: InstanceId::new("inst-001"),
         attempt,
         retry_policy: RetryPolicy::default(),
+        timeout: None,
     }
 }
 
@@ -385,6 +386,7 @@ async fn activity_task_msgpack_roundtrip_preserves_all_fields() {
             backoff_coefficient: 2.0,
             max_interval_ms: 5000,
         },
+        timeout: None,
     };
 
     let bytes = task.to_msgpack().expect("serialize should succeed");
@@ -626,6 +628,7 @@ async fn retry_policy_passed_correctly_to_handler() {
         instance_id: InstanceId::new("inst-retry"),
         attempt: 1,
         retry_policy: custom_policy.clone(),
+        timeout: None,
     };
 
     enqueue_activity(&server.js, &task).await.expect("enqueue");

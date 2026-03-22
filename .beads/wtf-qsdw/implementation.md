@@ -1,27 +1,31 @@
-# Implementation Summary: Per-Activity Timeout Support
+# Implementation Summary
 
-## Changes Made
+## Bead: wtf-qsdw
+## Title: Per-Activity Timeout Support
 
-### 1. `crates/wtf-worker/src/queue.rs`
-- Added `timeout_ms: Option<u64>` field to `ActivityTask` struct
-- Updated `make_task` test helper to include `timeout_ms: None`
+## Implemented
 
-### 2. `crates/wtf-worker/src/worker.rs`
-- Added `tokio::time::{Duration, timeout}` imports
-- Modified `process_task` to wrap handler execution in `tokio::time::timeout` when `timeout_ms` is `Some`
-- On timeout: calls `fail_activity` with error "Activity timeout elapsed" and appropriate `retries_exhausted` flag
-- Task is acked after timeout failure is recorded
+- Extended `ActivityTask` with per-activity timeout:
+  - Added `timeout: Option<Duration>` field in `crates/wtf-worker/src/queue.rs`.
+  - Added msgpack-compatible timeout serialization/deserialization shim.
+  - Added `ActivityTask::validate()` enforcing timeout constraints.
+  - `from_msgpack()` now validates decoded tasks.
 
-## Key Design Decisions
+- Updated worker flow to preserve timeout across retries:
+  - retry task clone now propagates `timeout` field.
 
-1. **Timeout as milliseconds**: `timeout_ms: Option<u64>` aligns with existing `RetryPolicy` pattern using millisecond intervals
-2. **No timeout extension**: Once a task starts, its timeout is fixed (no renewal mid-execution)
-3. **Timeout is permanent failure**: Timed-out activities are not retried automatically; the retry decision follows the existing `retries_exhausted` logic
-4. **tokio::time::timeout**: Used over `tokio::time::sleep` + race to cleanly cancel the future
+- Added tests for timeout contract boundaries:
+  - zero timeout rejected
+  - 1ms timeout accepted
 
-## Behavior Summary
+- Updated integration fixtures to include `timeout` field in all task constructors.
 
-| `timeout_ms` | Behavior |
-|---|---|
-| `None` | No timeout enforcement, runs to completion |
-| `Some(ms)` | Fails with "Activity timeout elapsed" if handler exceeds `ms` milliseconds |
+## Verification
+
+- `cargo test -p wtf-worker -- --nocapture`
+
+## Files changed
+
+- `crates/wtf-worker/src/queue.rs`
+- `crates/wtf-worker/src/worker.rs`
+- `crates/wtf-worker/tests/worker_integration_tests.rs`

@@ -26,6 +26,7 @@ use async_nats::jetstream::Context;
 use bytes::Bytes;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use wtf_common::{ActivityId, InstanceId, NamespaceId, RetryPolicy, WtfError};
 
 /// NATS JetStream stream name for the activity work queue.
@@ -52,9 +53,25 @@ pub struct ActivityTask {
     pub attempt: u32,
     /// Retry policy — used by the worker to decide whether to re-enqueue.
     pub retry_policy: RetryPolicy,
+    /// Optional per-activity timeout. `None` means no timeout.
+    #[serde(default, with = "timeout_serde")]
+    pub timeout: Option<Duration>,
 }
 
 impl ActivityTask {
+    /// Validate task invariants.
+    ///
+    /// # Errors
+    /// Returns `WtfError::InvalidInput` when timeout is set below 1ms.
+    pub fn validate(&self) -> Result<(), WtfError> {
+        match self.timeout {
+            Some(timeout) if timeout < Duration::from_millis(1) => Err(WtfError::InvalidInput {
+                detail: "activity timeout must be >= 1ms".to_owned(),
+            }),
+            _ => Ok(()),
+        }
+    }
+
     /// Serialize this task to msgpack bytes for storing in the NATS work queue.
     ///
     /// # Errors
@@ -72,12 +89,34 @@ impl ActivityTask {
     pub fn from_msgpack(bytes: &[u8]) -> Result<Self, WtfError> {
         rmp_serde::from_slice(bytes)
             .map_err(|e| WtfError::nats_publish(format!("deserialize ActivityTask: {e}")))
+            .and_then(|task: Self| task.validate().map(|_| task))
     }
 
     /// Build the NATS subject for dispatching this task.
     #[must_use]
     pub fn subject(&self) -> String {
         format!("{}.{}", WORK_SUBJECT_PREFIX, self.activity_type)
+    }
+}
+
+mod timeout_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::Duration;
+
+    pub fn serialize<S>(value: &Option<Duration>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        value
+            .map(|timeout| timeout.as_millis() as u64)
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Option::<u64>::deserialize(deserializer).map(|v| v.map(Duration::from_millis))
     }
 }
 
@@ -248,6 +287,7 @@ mod tests {
             instance_id: InstanceId::new("inst-001"),
             attempt,
             retry_policy: RetryPolicy::default(),
+            timeout: None,
         }
     }
 
@@ -296,6 +336,24 @@ mod tests {
     fn activity_task_from_msgpack_invalid_bytes_returns_error() {
         let result = ActivityTask::from_msgpack(b"not msgpack at all!!!");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn activity_task_rejects_zero_timeout() {
+        let task = ActivityTask {
+            timeout: Some(Duration::ZERO),
+            ..make_task("charge_card", 1)
+        };
+        assert!(task.validate().is_err());
+    }
+
+    #[test]
+    fn activity_task_accepts_one_millisecond_timeout() {
+        let task = ActivityTask {
+            timeout: Some(Duration::from_millis(1)),
+            ..make_task("charge_card", 1)
+        };
+        assert!(task.validate().is_ok());
     }
 
     #[test]

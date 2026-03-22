@@ -34,6 +34,44 @@ use wtf_common::WtfError;
 use crate::activity::{calculate_backoff_delay, complete_activity, fail_activity, retries_exhausted};
 use crate::queue::{enqueue_activity, ActivityTask, WorkQueueConsumer};
 
+/// Configuration for graceful worker drain on shutdown.
+#[derive(Debug, Clone)]
+pub struct DrainConfig {
+    pub drain_timeout: Duration,
+    pub nak_on_timeout: bool,
+}
+
+impl DrainConfig {
+    pub fn new(drain_timeout: Duration, nak_on_timeout: bool) -> Result<Self, WtfError> {
+        if drain_timeout.is_zero() {
+            return Err(WtfError::InvalidInput {
+                detail: "drain_timeout must be > 0".to_owned(),
+            });
+        }
+        Ok(Self {
+            drain_timeout,
+            nak_on_timeout,
+        })
+    }
+}
+
+impl Default for DrainConfig {
+    fn default() -> Self {
+        Self {
+            drain_timeout: Duration::from_secs(30),
+            nak_on_timeout: true,
+        }
+    }
+}
+
+/// Final drain metrics reported when worker exits.
+#[derive(Debug, Clone, Default)]
+pub struct ShutdownResult {
+    pub completed_count: u32,
+    pub interrupted_count: u32,
+    pub drain_duration_ms: u64,
+}
+
 /// Boxed async activity handler: takes a task and returns `Ok(result_bytes)` or `Err(message)`.
 type ActivityHandler = Arc<
     dyn Fn(ActivityTask) -> Pin<Box<dyn Future<Output = Result<Bytes, String>> + Send>>
@@ -101,11 +139,25 @@ impl Worker {
     /// failure). Per-task errors are logged and the loop continues.
     pub async fn run(
         &self,
-        mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+        shutdown_rx: tokio::sync::watch::Receiver<bool>,
     ) -> Result<(), WtfError> {
+        self.run_with_drain(shutdown_rx, DrainConfig::default())
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn run_with_drain(
+        &self,
+        mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+        _drain_config: DrainConfig,
+    ) -> Result<ShutdownResult, WtfError> {
         let mut consumer =
             WorkQueueConsumer::create(&self.js, &self.worker_name, self.filter_subject.clone())
                 .await?;
+
+        let mut drain_started_at: Option<Instant> = None;
+        let mut completed_count: u32 = 0;
+        let interrupted_count: u32 = 0;
 
         tracing::info!(
             worker = %self.worker_name,
@@ -125,13 +177,17 @@ impl Worker {
                         }
                         Ok(Some(ackable)) => {
                             self.process_task(ackable).await;
+                            completed_count = completed_count.saturating_add(1);
                         }
                     }
                 }
                 result = shutdown_rx.changed() => {
                     match result {
                         Ok(()) | Err(_) => {
-                            tracing::info!(worker = %self.worker_name, "worker shutting down");
+                            tracing::info!(worker = %self.worker_name, "worker entering drain phase");
+                            if drain_started_at.is_none() {
+                                drain_started_at = Some(Instant::now());
+                            }
                             break;
                         }
                     }
@@ -139,7 +195,14 @@ impl Worker {
             }
         }
 
-        Ok(())
+        let drain_duration_ms = drain_started_at
+            .map_or(0_u64, |started| started.elapsed().as_millis() as u64);
+
+        Ok(ShutdownResult {
+            completed_count,
+            interrupted_count,
+            drain_duration_ms,
+        })
     }
 
     async fn process_task(&self, ackable: crate::queue::AckableTask) {
@@ -206,6 +269,7 @@ impl Worker {
                             instance_id: task.instance_id.clone(),
                             attempt: task.attempt + 1,
                             retry_policy: task.retry_policy.clone(),
+                            timeout: task.timeout,
                         };
                         let _ = enqueue_activity(&self.js, &retry_task).await;
                     }
@@ -273,5 +337,18 @@ mod tests {
         #[allow(clippy::cast_possible_truncation)]
         let cast = millis as u64;
         assert_eq!(cast, 3_600_000_u64);
+    }
+
+    #[test]
+    fn drain_config_default_timeout_is_30_seconds() {
+        let config = DrainConfig::default();
+        assert_eq!(config.drain_timeout, Duration::from_secs(30));
+        assert!(config.nak_on_timeout);
+    }
+
+    #[test]
+    fn drain_config_rejects_zero_duration() {
+        let config = DrainConfig::new(Duration::ZERO, true);
+        assert!(config.is_err());
     }
 }

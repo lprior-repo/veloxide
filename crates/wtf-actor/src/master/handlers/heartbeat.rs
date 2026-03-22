@@ -3,15 +3,41 @@ use wtf_common::{InstanceId, InstanceMetadata};
 use crate::messages::{InstanceArguments, OrchestratorMsg};
 use crate::master::state::OrchestratorState;
 use crate::instance::WorkflowInstance;
+use std::collections::HashSet;
+use std::sync::{Mutex, OnceLock};
+
+fn in_flight_set() -> &'static Mutex<HashSet<String>> {
+    static IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    IN_FLIGHT.get_or_init(|| Mutex::new(HashSet::new()))
+}
 
 pub async fn handle_heartbeat_expired(
     myself: ActorRef<OrchestratorMsg>,
     state: &mut OrchestratorState,
     instance_id: InstanceId,
 ) {
-    if state.active.contains_key(&instance_id) { return; }
+    if state.active.contains_key(&instance_id) {
+        tracing::debug!(instance_id = %instance_id, "heartbeat expired but instance still active; skipping recovery");
+        return;
+    }
 
-    let Some(metadata) = fetch_metadata(state, &instance_id).await else { return };
+    let in_flight_key = instance_id.to_string();
+    let inserted = in_flight_set()
+        .lock()
+        .ok()
+        .map(|mut set| set.insert(in_flight_key.clone()))
+        .unwrap_or(false);
+
+    if !inserted {
+        tracing::debug!(instance_id = %instance_id, "recovery already in-flight; skipping duplicate trigger");
+        return;
+    }
+
+    let Some(metadata) = fetch_metadata(state, &instance_id).await else {
+        tracing::warn!(instance_id = %instance_id, "instance metadata missing; recovery skipped");
+        let _ = in_flight_set().lock().map(|mut set| set.remove(&in_flight_key));
+        return;
+    };
 
     let args = build_recovery_args(state, &metadata);
     let name = format!("wf-recovered-{}", instance_id.as_str());
@@ -21,6 +47,8 @@ pub async fn handle_heartbeat_expired(
     ).await {
         state.register(instance_id, actor_ref);
     }
+
+    let _ = in_flight_set().lock().map(|mut set| set.remove(&in_flight_key));
 }
 
 async fn fetch_metadata(state: &OrchestratorState, id: &InstanceId) -> Option<InstanceMetadata> {
