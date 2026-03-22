@@ -7,7 +7,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use wtf_cli::admin::{run_rebuild_views, RebuildViewsConfig};
-use wtf_cli::serve::{run_serve, ServeConfig};
+use wtf_cli::serve::{run_serve, run_serve_loop, ServeConfig};
 
 #[derive(Parser)]
 #[command(name = "wtf")]
@@ -107,9 +107,11 @@ async fn handle_command(cmd: Commands) -> anyhow::Result<std::process::ExitCode>
 }
 
 async fn handle_serve(config: ServeConfig) -> anyhow::Result<std::process::ExitCode> {
-    let _nats = run_serve(config).await.context("serve command failed")?;
-    println!("Storage provisioned. Server ready.");
-    Ok(std::process::ExitCode::SUCCESS)
+    let nats = run_serve(config.clone())
+        .await
+        .context("failed to provision NATS storage")?;
+
+    run_serve_loop(config, nats).await
 }
 
 async fn handle_lint(paths: Vec<String>) -> anyhow::Result<std::process::ExitCode> {
