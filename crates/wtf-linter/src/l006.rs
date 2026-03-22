@@ -63,6 +63,13 @@ impl L006Visitor {
                         .with_suggestion(
                             "Use workflow context's spawn method or convert to a child activity instead.",
                         ));
+                    } else if is_std_thread_sleep_path(&path_expr.path) {
+                        self.diagnostics.push(Diagnostic::new(
+                            LintCode::L006b,
+                            "std::thread::sleep() is not allowed inside a procedural workflow function. \
+                             Use ctx.sleep() for deterministic delays.",
+                        )
+                        .with_suggestion("Use ctx.sleep() instead for deterministic replay."));
                     }
                 }
                 for arg in &call.args {
@@ -182,4 +189,11 @@ fn is_std_thread_spawn_path(path: &syn::Path) -> bool {
         && path.segments[0].ident == "std"
         && path.segments[1].ident == "thread"
         && path.segments[2].ident == "spawn"
+}
+
+fn is_std_thread_sleep_path(path: &syn::Path) -> bool {
+    path.segments.len() == 3
+        && path.segments[0].ident == "std"
+        && path.segments[1].ident == "thread"
+        && path.segments[2].ident == "sleep"
 }

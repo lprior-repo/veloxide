@@ -20,6 +20,8 @@ pub enum LintCode {
     L005,
     /// `std::thread::spawn` inside workflow function.
     L006,
+    /// `std::thread::sleep` inside workflow function (should use ctx.sleep instead).
+    L006b,
 }
 
 impl LintCode {
@@ -40,6 +42,7 @@ impl LintCode {
             Self::L004 => "WTF-L004",
             Self::L005 => "WTF-L005",
             Self::L006 => "WTF-L006",
+            Self::L006b => "WTF-L006b",
         }
     }
 }
