@@ -38,6 +38,10 @@ pub struct ProceduralActorState {
     /// Currently dispatched operations: `operation_id` → `ActivityId`.
     pub in_flight: HashMap<u32, ActivityId>,
 
+    /// In-flight timers: `timer_id` → `operation_id` (for sleep replay).
+    #[serde(default)]
+    pub in_flight_timers: HashMap<String, u32>,
+
     /// JetStream sequence numbers already applied (idempotency — ADR-016).
     pub applied_seq: HashSet<u64>,
 
@@ -53,6 +57,7 @@ impl ProceduralActorState {
             checkpoint_map: HashMap::new(),
             operation_counter: 0,
             in_flight: HashMap::new(),
+            in_flight_timers: HashMap::new(),
             applied_seq: HashSet::new(),
             events_since_snapshot: 0,
         }
@@ -221,6 +226,32 @@ pub fn apply_event(
                 *operation_id,
                 Checkpoint { result: result_bytes, completed_seq: seq },
             );
+            next.applied_seq.insert(seq);
+            next.events_since_snapshot += 1;
+            (next, ProceduralApplyResult::None)
+        }
+
+        // Timer sleep: increment counter so the op_id slot is reserved.
+        // timer_id format for procedural sleeps: "{instance_id}:t:{op_id}".
+        WorkflowEvent::TimerScheduled { timer_id, .. } => {
+            let mut next = state.clone();
+            let op_id = next.operation_counter;
+            next.operation_counter += 1;
+            next.in_flight_timers.insert(timer_id.clone(), op_id);
+            next.applied_seq.insert(seq);
+            next.events_since_snapshot += 1;
+            (next, ProceduralApplyResult::None)
+        }
+
+        // Timer fired: create checkpoint so ctx.sleep() replays without re-scheduling.
+        WorkflowEvent::TimerFired { timer_id } => {
+            let mut next = state.clone();
+            if let Some(op_id) = next.in_flight_timers.remove(timer_id.as_str()) {
+                next.checkpoint_map.insert(
+                    op_id,
+                    Checkpoint { result: Bytes::new(), completed_seq: seq },
+                );
+            }
             next.applied_seq.insert(seq);
             next.events_since_snapshot += 1;
             (next, ProceduralApplyResult::None)

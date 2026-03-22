@@ -121,7 +121,7 @@ impl WorkflowContext {
         let result = self
             .myself
             .call(
-                |reply| InstanceMsg::ProceduralSleep { duration, reply },
+                |reply| InstanceMsg::ProceduralSleep { operation_id: op_id, duration, reply },
                 None,
             )
             .await?;

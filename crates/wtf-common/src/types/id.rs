@@ -137,6 +137,13 @@ impl TimerId {
         Self(id.into())
     }
 
+    /// Create a deterministic timer ID for a procedural workflow sleep operation.
+    /// Format: `"{instance_id}:t:{op_id}"` — stable across restarts for the same op.
+    #[must_use]
+    pub fn procedural(instance_id: &InstanceId, op_id: u32) -> Self {
+        Self(format!("{}:t:{}", instance_id.as_str(), op_id))
+    }
+
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
@@ -153,5 +160,34 @@ impl FromStr for TimerId {
     type Err = std::convert::Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(s.to_owned()))
+    }
+}
+
+#[cfg(test)]
+mod timer_id_determinism_tests {
+    use super::*;
+
+    /// TimerId::procedural must produce a deterministic id from instance_id + op_id.
+    /// Bug: handle_sleep uses ulid::Ulid::new() — different on each restart.
+    /// Fix: TimerId must derive from (instance_id, op_id) so restarts reproduce the same id.
+    #[test]
+    fn timer_id_procedural_is_deterministic_for_same_op_id() {
+        let instance_id = InstanceId::new("inst-01");
+        let op_id = 3u32;
+
+        let id1 = TimerId::procedural(&instance_id, op_id);
+        let id2 = TimerId::procedural(&instance_id, op_id);
+
+        assert_eq!(id1, id2, "same op_id must yield the same timer_id on every call");
+        assert_eq!(id1.as_str(), "inst-01:t:3");
+    }
+
+    #[test]
+    fn timer_id_procedural_differs_for_different_op_ids() {
+        let instance_id = InstanceId::new("inst-01");
+        assert_ne!(
+            TimerId::procedural(&instance_id, 0),
+            TimerId::procedural(&instance_id, 1),
+        );
     }
 }

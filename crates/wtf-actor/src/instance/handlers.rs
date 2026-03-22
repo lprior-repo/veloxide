@@ -36,8 +36,8 @@ async fn handle_procedural_msg(
         InstanceMsg::ProceduralDispatch { activity_type, payload, reply } => {
             procedural::handle_dispatch(state, activity_type, payload, reply).await;
         }
-        InstanceMsg::ProceduralSleep { duration, reply } => {
-            procedural::handle_sleep(state, duration, reply).await;
+        InstanceMsg::ProceduralSleep { operation_id, duration, reply } => {
+            procedural::handle_sleep(state, operation_id, duration, reply).await;
         }
         InstanceMsg::ProceduralNow { operation_id, reply } => {
             procedural::handle_now(state, operation_id, reply).await;

@@ -115,7 +115,7 @@ pub async fn start_procedural_workflow(
     if let Some(wf_fn) = &state.args.procedural_workflow {
         let ctx = crate::procedural::WorkflowContext::new(
             state.args.instance_id.clone(),
-            state.paradigm_state.operation_counter(),
+            0,
             myself.clone(),
         );
         let handle = tokio::spawn(run_procedural(Arc::clone(wf_fn), ctx, myself.clone()));

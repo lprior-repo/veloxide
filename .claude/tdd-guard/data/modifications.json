@@ -4,9 +4,9 @@
   "hook_event_name": "PreToolUse",
   "tool_name": "Edit",
   "tool_input": {
-    "file_path": "/home/lewis/src/wtf-engine/crates/wtf-actor/tests/procedural_ctx_start_at_zero.rs",
-    "old_string": "/// A workflow function that captures the initial op_counter value from its context.\nstruct CaptureInitialOpCounter {",
-    "new_string": "/// A workflow function that captures the initial op_counter value from its context.\n#[derive(Debug)]\nstruct CaptureInitialOpCounter {",
+    "file_path": "/home/lewis/src/wtf-engine/crates/wtf-actor/src/instance/procedural_utils.rs",
+    "old_string": "        let value: u64 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.subsec_nanos() as u64 ^ (d.as_secs() << 32));\n        let event = WorkflowEvent::RandomSampled { operation_id: op_id, value };\n        if let Some(store) = &state.args.event_store {\n            if let Ok(seq) = store.publish(&state.args.namespace, &state.args.instance_id, event.clone()).await {\n                let _ = handlers::inject_event(state, seq, &event).await;\n            }\n        }\n        let _ = reply.send(value);\n    }\n}",
+    "new_string": "        let value: u64 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.subsec_nanos() as u64 ^ (d.as_secs() << 32));\n        let event = WorkflowEvent::RandomSampled { operation_id: op_id, value };\n        if let Some(store) = &state.args.event_store {\n            if let Ok(seq) = store.publish(&state.args.namespace, &state.args.instance_id, event.clone()).await {\n                let _ = handlers::inject_event(state, seq, &event).await;\n                let _ = reply.send(value);\n            }\n            // If publish failed, drop reply — caller will timeout/error rather than get a\n            // non-deterministic value that wasn't persisted.\n        }\n        // If no event_store, drop reply — operation cannot be made deterministic.\n    }\n}",
     "replace_all": false
   }
 }

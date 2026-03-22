@@ -73,11 +73,12 @@ async fn append_and_inject_event(
 
 pub async fn handle_sleep(
     state: &mut InstanceState,
+    operation_id: u32,
     duration: std::time::Duration,
     reply: ractor::RpcReplyPort<Result<(), WtfError>>,
 ) {
     if let ParadigmState::Procedural(_) = &state.paradigm_state {
-        let timer_id = wtf_common::TimerId::new(ulid::Ulid::new().to_string());
+        let timer_id = wtf_common::TimerId::procedural(&state.args.instance_id, operation_id);
         let fire_at = chrono::Utc::now() + chrono::Duration::from_std(duration)
             .unwrap_or_else(|_| chrono::Duration::zero());
 

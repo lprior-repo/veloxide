@@ -26,9 +26,12 @@ pub async fn handle_now(
         if let Some(store) = &state.args.event_store {
             if let Ok(seq) = store.publish(&state.args.namespace, &state.args.instance_id, event.clone()).await {
                 let _ = handlers::inject_event(state, seq, &event).await;
+                let _ = reply.send(ts);
             }
+            // If publish failed, drop reply — caller will timeout/error rather than get a
+            // non-deterministic value that wasn't persisted.
         }
-        let _ = reply.send(ts);
+        // If no event_store, drop reply — operation cannot be made deterministic.
     }
 }
 
@@ -49,9 +52,12 @@ pub async fn handle_random(
         if let Some(store) = &state.args.event_store {
             if let Ok(seq) = store.publish(&state.args.namespace, &state.args.instance_id, event.clone()).await {
                 let _ = handlers::inject_event(state, seq, &event).await;
+                let _ = reply.send(value);
             }
+            // If publish failed, drop reply — caller will timeout/error rather than get a
+            // non-deterministic value that wasn't persisted.
         }
-        let _ = reply.send(value);
+        // If no event_store, drop reply — operation cannot be made deterministic.
     }
 }
 

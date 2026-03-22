@@ -68,6 +68,7 @@ pub enum InstanceMsg {
         reply: RpcReplyPort<Result<Bytes, WtfError>>,
     },
     ProceduralSleep {
+        operation_id: u32,
         duration: std::time::Duration,
         reply: RpcReplyPort<Result<(), WtfError>>,
     },
