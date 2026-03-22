@@ -5186,6 +5186,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-stream",
  "tracing",
  "ulid",
  "wtf-common",
