@@ -7,9 +7,10 @@ use std::sync::Arc;
 use wtf_common::{ActivityId, WtfError, WorkflowEvent};
 
 use crate::messages::{
-    InstanceMsg, InstancePhase, InstancePhaseView, InstanceStatusSnapshot,
+    InstanceArguments, InstanceMsg, InstancePhase, InstancePhaseView, InstanceStatusSnapshot,
     WorkflowParadigm,
 };
+use wtf_storage::{ReplayBatch, ReplayConfig};
 use super::state::InstanceState;
 use super::lifecycle;
 use super::procedural;
@@ -23,7 +24,7 @@ impl Actor for WorkflowInstance {
     type State = InstanceState;
     type Arguments = crate::messages::InstanceArguments;
 
-    async fn pre_start(
+async fn pre_start(
         &self,
         myself: ActorRef<InstanceMsg>,
         args: Self::Arguments,
@@ -36,56 +37,11 @@ impl Actor for WorkflowInstance {
             "WorkflowInstance starting"
         );
 
-        let mut state = InstanceState::initial(args);
-        let mut event_log = Vec::new();
+        let (mut state, from_seq) = load_initial_state(args).await?;
+        let event_log = replay_events(&mut state, from_seq).await?;
 
-        // 1. Replay events from JetStream
         if let Some(nats) = &state.args.nats {
-            let js = nats.jetstream();
-            let mut consumer = wtf_storage::create_replay_consumer(
-                js,
-                &state.args.namespace,
-                &state.args.instance_id,
-                &wtf_storage::ReplayConfig::default(),
-            )
-            .await
-            .map_err(|e| ActorProcessingErr::from(Box::new(e)))?;
-
-            loop {
-                match consumer.next_event().await {
-                    Ok(wtf_storage::ReplayBatch::Event(replayed)) => {
-                        event_log.push(replayed.event.clone());
-                        state.paradigm_state = state
-                            .paradigm_state
-                            .apply_event(&replayed.event, replayed.seq, InstancePhase::Replay)
-                            .map_err(|e| ActorProcessingErr::from(Box::new(e)))?;
-                        state.total_events_applied += 1;
-                    }
-                    Ok(wtf_storage::ReplayBatch::TailReached) => break,
-                    Err(e) => return Err(ActorProcessingErr::from(Box::new(e))),
-                }
-            }
-
-            tracing::info!(
-                instance_id = %state.args.instance_id,
-                events = state.total_events_applied,
-                "Replay complete"
-            );
-
-            // 2. Transition to Live phase
-            let actions = lifecycle::compute_live_transition(
-                &state.args.instance_id,
-                state.args.paradigm,
-                &state.paradigm_state,
-                &event_log,
-            );
-
-            // 3. Execute transition side effects (re-dispatches, re-arm timers)
-            if let Ok(timers_kv) = js.get_key_value(wtf_storage::bucket_names::TIMERS).await {
-                lifecycle::execute_transition_actions(nats, &timers_kv, actions)
-                    .await
-                    .map_err(|e| ActorProcessingErr::from(Box::new(e)))?;
-            }
+            transition_to_live(&state.args, &state.paradigm_state, &event_log, nats).await?;
         }
 
         state.phase = InstancePhase::Live;
@@ -95,26 +51,7 @@ impl Actor for WorkflowInstance {
 
         // 5. If procedural, spawn the workflow task
         if state.args.paradigm == WorkflowParadigm::Procedural {
-            if let Some(wf_fn) = &state.args.procedural_workflow {
-                let ctx = crate::procedural::WorkflowContext::new(
-                    state.args.instance_id.clone(),
-                    state.paradigm_state.operation_counter(),
-                    myself.clone(),
-                );
-                let wf_fn = Arc::clone(wf_fn);
-                let myself_clone = myself.clone();
-                let handle = tokio::spawn(async move {
-                    match wf_fn.execute(ctx).await {
-                        Ok(_) => {
-                            let _ = myself_clone.cast(InstanceMsg::ProceduralWorkflowCompleted);
-                        }
-                        Err(e) => {
-                            let _ = myself_clone.cast(InstanceMsg::ProceduralWorkflowFailed(e.to_string()));
-                        }
-                    }
-                });
-                state.procedural_task = Some(handle);
-            }
+            start_procedural_workflow(&mut state, &myself).await?;
         }
 
         Ok(state)
@@ -228,4 +165,150 @@ impl Actor for WorkflowInstance {
         }
         Ok(())
     }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async fn load_initial_state(
+    args: InstanceArguments,
+) -> Result<(InstanceState, u64), ActorProcessingErr> {
+    let mut state = InstanceState::initial(args.clone());
+    let mut from_seq = 1;
+
+    if let Some(db) = &args.snapshot_db {
+        if let Ok(Some(snap)) = wtf_storage::read_snapshot(db, &args.instance_id) {
+            state.paradigm_state = deserialize_paradigm_state(args.paradigm, &snap.state_bytes)?;
+            state.total_events_applied = snap.seq;
+            from_seq = snap.seq + 1;
+            tracing::info!(instance_id = %args.instance_id, seq = snap.seq, "Snapshot loaded");
+        }
+    }
+    Ok((state, from_seq))
+}
+
+pub fn deserialize_paradigm_state(
+    paradigm: WorkflowParadigm,
+    bytes: &[u8],
+) -> Result<lifecycle::ParadigmState, ActorProcessingErr> {
+    use lifecycle::ParadigmState;
+    match paradigm {
+        WorkflowParadigm::Fsm => Ok(ParadigmState::Fsm(
+            rmp_serde::from_slice(bytes).map_err(|e| ActorProcessingErr::from(Box::new(e)))?,
+        )),
+        WorkflowParadigm::Dag => Ok(ParadigmState::Dag(
+            rmp_serde::from_slice(bytes).map_err(|e| ActorProcessingErr::from(Box::new(e)))?,
+        )),
+        WorkflowParadigm::Procedural => Ok(ParadigmState::Procedural(
+            rmp_serde::from_slice(bytes).map_err(|e| ActorProcessingErr::from(Box::new(e)))?,
+        )),
+    }
+}
+
+async fn replay_events(
+    state: &mut InstanceState,
+    from_seq: u64,
+) -> Result<Vec<WorkflowEvent>, ActorProcessingErr> {
+    let mut event_log = Vec::new();
+    let nats = match &state.args.nats {
+        Some(n) => n,
+        None => return Ok(event_log),
+    };
+    let mut consumer = create_consumer(nats, &state.args, from_seq).await?;
+
+    while let Some(event) = next_replayed_event(&mut consumer, state).await? {
+        event_log.push(event);
+    }
+
+    tracing::info!(
+        instance_id = %state.args.instance_id,
+        events = state.total_events_applied,
+        "Replay complete"
+    );
+    Ok(event_log)
+}
+
+async fn create_consumer(
+    nats: &wtf_storage::NatsClient,
+    args: &InstanceArguments,
+    from_seq: u64,
+) -> Result<wtf_storage::ReplayConsumer, ActorProcessingErr> {
+    let config = ReplayConfig {
+        from_seq,
+        ..Default::default()
+    };
+    wtf_storage::create_replay_consumer(
+        nats.jetstream(),
+        &args.namespace,
+        &args.instance_id,
+        &config,
+    )
+    .await
+    .map_err(|e| ActorProcessingErr::from(Box::new(e)))
+}
+
+async fn next_replayed_event(
+    consumer: &mut wtf_storage::ReplayConsumer,
+    state: &mut InstanceState,
+) -> Result<Option<WorkflowEvent>, ActorProcessingErr> {
+    match consumer.next_event().await {
+        Ok(ReplayBatch::Event(replayed)) => {
+            state.paradigm_state = state
+                .paradigm_state
+                .apply_event(&replayed.event, replayed.seq, InstancePhase::Replay)
+                .map_err(|e| ActorProcessingErr::from(Box::new(e)))?;
+            state.total_events_applied += 1;
+            Ok(Some(replayed.event))
+        }
+        Ok(ReplayBatch::TailReached) => Ok(None),
+        Err(e) => Err(ActorProcessingErr::from(Box::new(e))),
+    }
+}
+
+async fn transition_to_live(
+    args: &InstanceArguments,
+    paradigm_state: &lifecycle::ParadigmState,
+    event_log: &[WorkflowEvent],
+    nats: &wtf_storage::NatsClient,
+) -> Result<(), ActorProcessingErr> {
+    let js = nats.jetstream();
+    let actions = lifecycle::compute_live_transition(
+        &args.instance_id,
+        args.paradigm,
+        paradigm_state,
+        event_log,
+    );
+
+    if let Ok(timers_kv) = js.get_key_value(wtf_storage::bucket_names::TIMERS).await {
+        lifecycle::execute_transition_actions(nats, &timers_kv, actions)
+            .await
+            .map_err(|e| ActorProcessingErr::from(Box::new(e)))?;
+    }
+    Ok(())
+}
+
+async fn start_procedural_workflow(
+    state: &mut InstanceState,
+    myself: &ActorRef<InstanceMsg>,
+) -> Result<(), ActorProcessingErr> {
+    if let Some(wf_fn) = &state.args.procedural_workflow {
+        let ctx = crate::procedural::WorkflowContext::new(
+            state.args.instance_id.clone(),
+            state.paradigm_state.operation_counter(),
+            myself.clone(),
+        );
+        let wf_fn = Arc::clone(wf_fn);
+        let myself_clone = myself.clone();
+        let handle = tokio::spawn(async move {
+            match wf_fn.execute(ctx).await {
+                Ok(_) => {
+                    let _ = myself_clone.cast(InstanceMsg::ProceduralWorkflowCompleted);
+                }
+                Err(e) => {
+                    let _ = myself_clone.cast(InstanceMsg::ProceduralWorkflowFailed(e.to_string()));
+                }
+            }
+        });
+        state.procedural_task = Some(handle);
+    }
+    Ok(())
 }

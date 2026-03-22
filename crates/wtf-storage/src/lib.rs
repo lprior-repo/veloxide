@@ -31,8 +31,8 @@ pub use kv::{
 pub use nats::{connect, NatsClient, NatsConfig};
 pub use provision::{provision_streams, stream_names, subjects, verify_streams};
 pub use replay::{
-    create_replay_consumer, replay_start_seq, ReplayBatch, ReplayConfig, ReplayConsumer,
-    ReplayedEvent,
+    create_replay_consumer, replay_events, replay_start_seq, ReplayBatch, ReplayConfig,
+    ReplayConsumer, ReplayedEvent,
 };
 pub use snapshots::{
     delete_snapshot, open_snapshot_db, read_snapshot, write_snapshot, SnapshotRecord,

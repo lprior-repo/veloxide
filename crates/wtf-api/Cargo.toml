@@ -13,6 +13,7 @@ wtf-worker = { path = "../wtf-worker" }
 wtf-linter = { path = "../wtf-linter" }
 
 ractor = { workspace = true }
+async-nats = { workspace = true }
 
 # Web framework
 axum = { workspace = true }
@@ -22,6 +23,7 @@ reqwest = { workspace = true }
 
 # Async
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 futures = { workspace = true }
 
 # Serialization
@@ -39,3 +41,4 @@ bytes = { workspace = true }
 
 # Regex for validation
 regex = { workspace = true }
+sled = "0.34"

@@ -21,6 +21,7 @@ use async_nats::jetstream::{
     Context,
 };
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use wtf_common::{InstanceId, NamespaceId, WorkflowEvent, WtfError};
 
@@ -33,6 +34,8 @@ pub struct ReplayedEvent {
     pub seq: u64,
     /// The decoded workflow event.
     pub event: WorkflowEvent,
+    /// JetStream message timestamp.
+    pub timestamp: DateTime<Utc>,
 }
 
 /// Configuration for a replay consumer.
@@ -92,8 +95,11 @@ impl ReplayConsumer {
                     .info()
                     .map_err(|e| WtfError::nats_publish(format!("read msg info: {e}")))?;
                 let seq = info.stream_sequence;
+                let ts = info.published;
+                let timestamp = DateTime::<Utc>::from_timestamp(ts.unix_timestamp(), ts.nanosecond())
+                    .unwrap_or_default();
                 let event = decode_event(msg.payload.clone())?;
-                Ok(ReplayBatch::Event(ReplayedEvent { seq, event }))
+                Ok(ReplayBatch::Event(ReplayedEvent { seq, event, timestamp }))
             }
             Ok(Some(Err(e))) => Err(WtfError::nats_publish(format!("replay stream error: {e}"))),
             Ok(None) => {
@@ -103,6 +109,26 @@ impl ReplayConsumer {
             Err(_timeout) => Ok(ReplayBatch::TailReached),
         }
     }
+}
+
+/// Stream events starting from `config.from_seq`.
+///
+/// # Errors
+/// Returns `WtfError::NatsPublish` if consumer creation fails.
+pub async fn replay_events(
+    js: Context,
+    namespace: NamespaceId,
+    instance_id: InstanceId,
+    config: ReplayConfig,
+) -> Result<impl futures::Stream<Item = Result<ReplayedEvent, WtfError>>, WtfError> {
+    let consumer = create_replay_consumer(&js, &namespace, &instance_id, &config).await?;
+    Ok(futures::stream::unfold(consumer, |mut c| async move {
+        match c.next_event().await {
+            Ok(ReplayBatch::Event(e)) => Some((Ok(e), c)),
+            Ok(ReplayBatch::TailReached) => None,
+            Err(e) => Some((Err(e), c)),
+        }
+    }))
 }
 
 /// Create an ephemeral ordered JetStream push consumer for replay.

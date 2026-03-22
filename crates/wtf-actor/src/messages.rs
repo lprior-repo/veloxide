@@ -37,6 +37,17 @@ pub enum WorkflowParadigm {
     Procedural,
 }
 
+/// Serialized form of a workflow graph for FSM or DAG paradigms.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorkflowDefinition {
+    /// Paradigm this definition implements.
+    pub paradigm: WorkflowParadigm,
+    /// JSON or YAML representation of the graph (nodes/edges or transitions).
+    pub graph_raw: String,
+    /// Human-readable description (optional).
+    pub description: Option<String>,
+}
+
 // ============================================================================
 // WorkflowInstance spawn arguments
 // ============================================================================
@@ -65,6 +76,8 @@ pub struct InstanceArguments {
     pub snapshot_db: Option<sled::Db>,
     /// Procedural workflow function (if paradigm is Procedural).
     pub procedural_workflow: Option<Arc<dyn WorkflowFn>>,
+    /// FSM or DAG definition (if paradigm is Fsm or Dag).
+    pub workflow_definition: Option<WorkflowDefinition>,
 }
 
 // ============================================================================
@@ -224,6 +237,16 @@ pub enum OrchestratorMsg {
         reply: RpcReplyPort<Vec<InstanceStatusSnapshot>>,
     },
 
+    /// Request the NATS client for JetStream/KV operations.
+    GetNatsContext {
+        reply: RpcReplyPort<Option<NatsClient>>,
+    },
+
+    /// Request the snapshot database handle.
+    GetSnapshotDb {
+        reply: RpcReplyPort<Option<sled::Db>>,
+    },
+
     /// Heartbeat entry expired in NATS KV — trigger crash recovery for this instance.
     ///
     /// Sent by the heartbeat watcher task (ADR-014). The orchestrator
@@ -321,5 +344,27 @@ mod tests {
         let id = InstanceId::new("test-id");
         let err = TerminateError::NotFound(id);
         assert!(err.to_string().contains("test-id"));
+    }
+
+    #[test]
+    fn instance_arguments_optional_fields_default_to_none() {
+        // Compile-time contract: all optional fields must accept None.
+        // This guards callers (master.rs, instance) against missing fields.
+        let args = InstanceArguments {
+            namespace: NamespaceId::new("ns"),
+            instance_id: InstanceId::new("inst"),
+            workflow_type: "wf".into(),
+            paradigm: WorkflowParadigm::Fsm,
+            input: bytes::Bytes::new(),
+            engine_node_id: "node".into(),
+            nats: None,
+            snapshot_db: None,
+            procedural_workflow: None,
+            workflow_definition: None,
+        };
+        assert!(args.snapshot_db.is_none());
+        assert!(args.workflow_definition.is_none());
+        assert!(args.nats.is_none());
+        assert!(args.procedural_workflow.is_none());
     }
 }

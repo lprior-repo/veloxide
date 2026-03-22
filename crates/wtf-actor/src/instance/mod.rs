@@ -57,6 +57,8 @@ mod tests {
             engine_node_id: "node-1".into(),
             nats: None,
             procedural_workflow: None,
+            snapshot_db: None,
+            workflow_definition: None,
         }
     }
 

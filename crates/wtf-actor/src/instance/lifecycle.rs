@@ -26,7 +26,8 @@ pub enum ParadigmApplyError {
 }
 
 /// Unified state for the three execution paradigms.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "paradigm", rename_all = "snake_case")]
 pub enum ParadigmState {
     Fsm(FsmActorState),
     Dag(DagActorState),
