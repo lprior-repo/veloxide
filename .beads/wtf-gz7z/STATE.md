@@ -1,15 +1,28 @@
 bead_id: wtf-gz7z
 bead_title: implement wtf-linter WTF-L001: non-deterministic-time
-phase: p1
-updated_at: 2026-03-21T00:22:05Z
+phase: contract-synthesis
+updated_at: 2026-03-22T00:00:00Z
 
-# Orchestrator Progress
+# STATE 1 - COMPLETE
+
+## Orchestrator Progress
 
 ## STATE 1: CONTRACT SYNTHESIS
-- [ ] rust-contract sub-agent
+- [x] rust-contract sub-agent ✅ COMPLETE
+- [x] contract.md written
+- [x] martin-fowler-tests.md written
+
+## STATE 1 REPAIR (retry 2/3)
+- [x] Defect 1 fixed: Scenario 16 description/code mismatch resolved
+- [x] Changed code from path-style `tokio::time::Instant::now()` to method-call style `tokio::time::Instant.now()`
+- [x] Updated NOTE to correctly describe method-call style detection
 
 ## STATE 2: TEST PLAN REVIEW
-- [ ] test-reviewer sub-agent
+- [x] test-reviewer sub-agent ✅ COMPLETE
+- [x] STATUS: REJECTED — FLAWED
+- [x] test-defects.md updated (1 defect: Scenario 16 title/assertion contradiction)
+- **Defect**: Scenario 16 title says "NOT flagged" but Then expects 1 diagnostic — internal contradiction
+- **Note**: Code was fixed (method-call style now correct), but title/assertion contradiction remains
 
 ## STATE 3: IMPLEMENTATION
 - [ ] functional-rust sub-agent
