@@ -1,150 +1,164 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+## Project Overview
 
-## Quick Reference
+wtf-engine is a durable execution runtime (~39K Rust LOC across 9 crates). It runs long-lived workflows with guaranteed no lost transitions — backed by NATS JetStream event log.
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
-```
+**Tech stack:** Rust (end-to-end), Ractor actors, axum HTTP, Dioxus WASM frontend, NATS JetStream/KV, sled snapshots.
 
-## Non-Interactive Shell Commands
+---
 
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
+## NATS Connection
 
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
-```bash
-# Force overwrite without prompting
-cp -f source dest           # NOT: cp source dest
-mv -f source dest           # NOT: mv source dest
-rm -f file                  # NOT: rm file
-
-# For recursive operations
-rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
-```
-
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
-
-<!-- BEGIN BEADS INTEGRATION profile:full hash:d4f96305 -->
-## Issue Tracking with bd (beads)
-
-**IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
-
-### Why bd?
-
-- Dependency-aware: Track blockers and relationships between issues
-- Git-friendly: Dolt-powered version control with native sync
-- Agent-optimized: JSON output, ready work detection, discovered-from links
-- Prevents duplicate tracking systems and confusion
-
-### Quick Start
-
-**Check for ready work:**
+NATS is running in Docker (`wtf-nats-test` container on port 4222):
 
 ```bash
-bd ready --json
+# Verify connection
+cargo run -p wtf-storage --bin nats_connect_test
+
+# Run full test suite (requires NATS)
+cargo test --workspace
 ```
 
-**Create new issues:**
+---
+
+## Issue Tracking with Beads
+
+**⚠️ Dolt/bd database is NOT available** in this environment (`database "wtf" not found on 127.0.0.1:3308`).
+
+Beads are tracked in `.beads/<bead-id>/` directories. Since bd is unavailable, contracts and test plans must be **synthesized from actual implementation code** — not pulled from a database.
+
+### Current Bead Status
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| **LANDED (STATE 8)** | 48 | Fully implemented, tested, committed |
+| **GHOST (STATE 1, empty)** | 11 | Need cleanup or re-implementation |
+| **Total** | 60 | |
+
+**Ghost beads (empty, no artifacts):**
+`wtf-2q3d`, `wtf-5eii`, `wtf-772u`, `wtf-bqiq`, `wtf-ibdy`, `wtf-iu4d`, `wtf-lrko`, `wtf-p19r`, `wtf-pc26`, `wtf-wygu`, `wtf-xgxr`
+
+---
+
+## Running Tests
 
 ```bash
-bd create "Issue title" --description="Detailed context" -t bug|feature|task -p 0-4 --json
-bd create "Issue title" --description="What this issue is about" -p 1 --deps discovered-from:bd-123 --json
+# All workspace tests (requires NATS running)
+cargo test --workspace
+
+# Crate-specific
+cargo test -p wtf-actor
+cargo test -p wtf-storage
+cargo test -p wtf-linter
+
+# With output
+cargo test --workspace -- --nocapture
+
+# Clippy
+cargo clippy --workspace -- -D warnings
 ```
 
-**Claim and update:**
-
-```bash
-bd update <id> --claim --json
-bd update bd-42 --priority 1 --json
-```
-
-**Complete work:**
-
-```bash
-bd close bd-42 --reason "Completed" --json
-```
-
-### Issue Types
-
-- `bug` - Something broken
-- `feature` - New functionality
-- `task` - Work item (tests, docs, refactoring)
-- `epic` - Large feature with subtasks
-- `chore` - Maintenance (dependencies, tooling)
-
-### Priorities
-
-- `0` - Critical (security, data loss, broken builds)
-- `1` - High (major features, important bugs)
-- `2` - Medium (default, nice-to-have)
-- `3` - Low (polish, optimization)
-- `4` - Backlog (future ideas)
-
-### Workflow for AI Agents
-
-1. **Check ready work**: `bd ready` shows unblocked issues
-2. **Claim your task atomically**: `bd update <id> --claim`
-3. **Work on it**: Implement, test, document
-4. **Discover new work?** Create linked issue:
-   - `bd create "Found bug" --description="Details about what was found" -p 1 --deps discovered-from:<parent-id>`
-5. **Complete**: `bd close <id> --reason "Done"`
-
-### Auto-Sync
-
-bd automatically syncs via Dolt:
-
-- Each write auto-commits to Dolt history
-- Use `bd dolt push`/`bd dolt pull` for remote sync
-- No manual export/import needed!
-
-### Important Rules
-
-- ✅ Use bd for ALL task tracking
-- ✅ Always use `--json` flag for programmatic use
-- ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Check `bd ready` before asking "what should I work on?"
-- ❌ Do NOT create markdown TODO lists
-- ❌ Do NOT use external issue trackers
-- ❌ Do NOT duplicate tracking systems
-
-For more details, see README.md and docs/QUICKSTART.md.
+---
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below:
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+1. **File issues for remaining work** — Create beads for anything that needs follow-up:
    ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
+   mkdir -p .beads/wtf-<id>
+   echo "STATE 1" > .beads/wtf-<id>/STATE.md
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+
+2. **Run quality gates** (if code changed):
+   ```bash
+   cargo test --workspace
+   cargo clippy --workspace -- -D warnings
+   cargo check --workspace
+   ```
+
+3. **Commit and push**:
+   ```bash
+   jj describe -m "description"
+   jj git push
+   ```
+
+4. **Verify**:
+   ```bash
+   jj log --no-graph -r "main | main@origin"
+   # Must show synced
+   ```
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Work is NOT complete until pushed to remote
+- NEVER stop before pushing — that leaves work stranded
+- If push fails, resolve and retry
 
-<!-- END BEADS INTEGRATION -->
+---
+
+## Go-skill Pipeline (Implementing New Features)
+
+Since bd is unavailable, use the go-skill pipeline with contract synthesis from existing code:
+
+```
+STATE 1 → rust-contract (synthesize contract.md + martin-fowler-tests.md from implementation)
+STATE 2 → test-reviewer (verify test plan quality)
+STATE 3 → functional-rust (verify implementation matches contract)
+STATE 4 → Moon Gate (cargo check, cargo test, cargo clippy)
+STATE 4.5 → qa-enforcer (actual command execution, not faked)
+STATE 4.6 → QA review
+STATE 5 → red-queen (adversarial testing to break implementation)
+STATE 5.5 → black-hat-reviewer
+STATE 5.7 → kani-justification or kani run
+STATE 6 → repair loop (if needed)
+STATE 7 → architectural-drift (enforce <300 line files, DDD principles)
+STATE 8 → jj git push --bookmark main
+```
+
+---
+
+## Non-Interactive Shell Commands
+
+**ALWAYS use non-interactive flags** with file operations:
+
+```bash
+# Force overwrite without prompting
+cp -f source dest
+mv -f source dest
+rm -f file
+
+# For recursive operations
+rm -rf directory
+cp -rf source dest
+```
+
+**Other commands that may prompt:**
+- `scp` — use `-o BatchMode=yes`
+- `ssh` — use `-o BatchMode=yes`
+- `apt-get` — use `-y` flag
+
+---
+
+## Key Crates
+
+| Crate | LOC | Purpose |
+|-------|-----|---------|
+| `wtf-common` | 690 | `WorkflowEvent`, `InstanceId`, `RetryPolicy` |
+| `wtf-actor` | 3,896 | Ractor actors, FSM/DAG/Procedural paradigms |
+| `wtf-storage` | 1,362 | JetStream journal, KV, sled snapshots |
+| `wtf-api` | 1,786 | axum HTTP, SSE, workflow handlers |
+| `wtf-cli` | 996 | `wtf serve`, `wtf lint`, `wtf admin` |
+| `wtf-linter` | 1,968 | 6 procedural workflow lint rules |
+| `wtf-frontend` | 27,145 | Dioxus WASM dashboard |
+
+---
+
+## Known Issues
+
+1. **7 journal_test failures** — assertions don't provide required `Extension<ActorRef<OrchestratorMsg>>`, all return 500 instead of expected status codes
+2. **11 ghost beads** — empty STATE 1 directories, no artifacts, no implementation
+3. **wtf-cli has 0 tests** — no test coverage
+4. **wtf-worker has 0 tests** — no test coverage
