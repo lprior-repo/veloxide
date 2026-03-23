@@ -6,3 +6,10 @@ pub mod health;
 pub mod routes;
 pub mod sse;
 pub mod types;
+
+#[cfg(test)]
+mod tests {
+    mod unit {
+        include!("../tests/unit/signal_handler_test.rs");
+    }
+}
