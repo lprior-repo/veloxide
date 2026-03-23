@@ -1,7 +1,7 @@
 bead_id: wtf-gz7z
 bead_title: implement wtf-linter WTF-L001: non-deterministic-time
-phase: contract-synthesis
-updated_at: 2026-03-22T00:00:00Z
+phase: landed
+updated_at: 2026-03-22T15:47:45Z
 
 # STATE 1 - COMPLETE
 
@@ -71,7 +71,7 @@ updated_at: 2026-03-22T00:00:00Z
 - [x] All 106 tests pass ✅
 
 ## STATE 8: LANDING
-- [ ] bd close
-- [ ] jj git push --bookmark main
-- [ ] jj workspace forget
-- [ ] rm -rf workspace
+- [x] jj git push --bookmark main ✅ — pushed to main
+- [x] All 11 artifact files committed
+- [x] main now at 3622301e (chore(wtf-gz7z): land WTF-L001 non-deterministic-time linter)
+- [x] Working copy clean, ready for next bead
