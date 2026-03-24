@@ -118,6 +118,7 @@ async fn start_procedural_workflow_creates_ctx_with_zero_op_counter_after_replay
         phase: InstancePhase::Live,
         total_events_applied: 2,
         events_since_snapshot: 2,
+        outbox: Vec::new(),
         pending_activity_calls: HashMap::new(),
         pending_timer_calls: HashMap::new(),
         pending_signal_calls: HashMap::new(),

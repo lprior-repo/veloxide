@@ -62,6 +62,7 @@ async fn inject_live_activity_completed_clears_in_flight_and_records_checkpoint(
         phase: InstancePhase::Live,
         total_events_applied: 1,
         events_since_snapshot: 1,
+        outbox: Vec::new(),
         pending_activity_calls: HashMap::new(),
         pending_timer_calls: HashMap::new(),
         pending_signal_calls: HashMap::new(),

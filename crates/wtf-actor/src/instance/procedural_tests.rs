@@ -28,6 +28,7 @@ fn make_procedural_state() -> InstanceState {
         phase: InstancePhase::Live,
         total_events_applied: 0,
         events_since_snapshot: 0,
+        outbox: Vec::new(),
         pending_activity_calls: HashMap::new(),
         pending_timer_calls: HashMap::new(),
         pending_signal_calls: HashMap::new(),

@@ -108,6 +108,7 @@ fn build_state_with_now_checkpoint_at_op1() -> (InstanceState, chrono::DateTime<
         phase: InstancePhase::Live,
         total_events_applied: 3,
         events_since_snapshot: 3,
+        outbox: Vec::new(),
         pending_activity_calls: HashMap::new(),
         pending_timer_calls: HashMap::new(),
         pending_signal_calls: HashMap::new(),

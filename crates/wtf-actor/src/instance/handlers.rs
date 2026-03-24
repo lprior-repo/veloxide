@@ -8,7 +8,33 @@ use super::state::InstanceState;
 use crate::messages::{current_state_view, InstanceMsg, InstancePhaseView, InstanceStatusSnapshot};
 use bytes::Bytes;
 use ractor::{ActorProcessingErr, ActorRef, RpcReplyPort};
-use wtf_common::{ActivityId, WorkflowEvent, WtfError};
+use std::time::Duration;
+use thiserror::Error;
+use wtf_common::{ActivityId, EventStore, WorkflowEvent, WtfError};
+
+/// Saga compensation errors for cancellation.
+#[derive(Debug, Error)]
+pub(crate) enum CancelError {
+    #[error("publish failed after {0} retries: {1}")]
+    PublishFailed(u32, WtfError),
+    #[error("outbox full (capacity {0})")]
+    OutboxFull(usize),
+    #[error("outbox drain failed: {0}")]
+    OutboxDrainFailed(WtfError),
+    #[error("cancellation timeout after {0} attempts")]
+    CancellationTimeout(u32),
+    #[error("actor not running")]
+    ActorNotRunning,
+}
+
+/// Maximum retry attempts for publishing cancellation events.
+const MAX_PUBLISH_RETRIES: u32 = 3;
+/// Initial backoff delay in milliseconds.
+const INITIAL_BACKOFF_MS: u64 = 100;
+/// Backoff multiplier for exponential retry.
+const BACKOFF_MULTIPLIER: u64 = 2;
+/// Maximum outbox capacity before fail-fast.
+const OUTBOX_CAPACITY: usize = 100;
 
 pub async fn handle_msg(
     myself_ref: ActorRef<InstanceMsg>,
@@ -61,13 +87,13 @@ async fn handle_procedural_msg(
             operation_id,
             reply,
         } => {
-            procedural::handle_now(state, operation_id, reply).await;
+            let _ = procedural::handle_now(state, operation_id, reply).await;
         }
         InstanceMsg::ProceduralRandom {
             operation_id,
             reply,
         } => {
-            procedural::handle_random(state, operation_id, reply).await;
+            let _ = procedural::handle_random(state, operation_id, reply).await;
         }
         InstanceMsg::ProceduralWaitForSignal {
             operation_id,
@@ -77,10 +103,10 @@ async fn handle_procedural_msg(
             procedural::handle_wait_for_signal(state, operation_id, signal_name, reply).await;
         }
         InstanceMsg::ProceduralWorkflowCompleted => {
-            procedural::handle_completed(myself_ref, state).await;
+            let _ = procedural::handle_completed(myself_ref, state).await;
         }
         InstanceMsg::ProceduralWorkflowFailed(err) => {
-            procedural::handle_failed(myself_ref, state, err).await;
+            let _ = procedural::handle_failed(myself_ref, state, err).await;
         }
         InstanceMsg::GetStatus(reply) => {
             let _ = handle_get_status(state, reply);
@@ -192,7 +218,7 @@ async fn handle_heartbeat(state: &InstanceState) -> Result<(), ActorProcessingEr
 
 pub(crate) async fn handle_cancel(
     myself_ref: ActorRef<InstanceMsg>,
-    state: &InstanceState,
+    state: &mut InstanceState,
     reason: String,
     reply: RpcReplyPort<Result<(), WtfError>>,
 ) -> Result<(), ActorProcessingErr> {
@@ -205,22 +231,137 @@ pub(crate) async fn handle_cancel(
     let event = WorkflowEvent::InstanceCancelled {
         reason: reason.clone(),
     };
-    if let Some(store) = &state.args.event_store {
-        if let Err(e) = store
-            .publish(&state.args.namespace, &state.args.instance_id, event)
-            .await
-        {
+
+    // I-1: publish must happen before actor stop
+    // Saga pattern: publish with compensation - retry, then outbox, then fail-safe
+    let publish_result = if let Some(store) = state.args.event_store.clone() {
+        let namespace = state.args.namespace.clone();
+        let instance_id = state.args.instance_id.clone();
+        let store_ref = store.as_ref();
+
+        // Retry loop with exponential backoff
+        let mut backoff_ms = INITIAL_BACKOFF_MS;
+        let mut last_err = None;
+
+        let mut attempt = 1;
+        loop {
+            match store_ref.publish(&namespace, &instance_id, event.clone()).await {
+                Ok(_) => {
+                    // Success - drain outbox if any pending events
+                    if !state.outbox.is_empty() {
+                        if let Err(e) = drain_outbox(state, store_ref).await {
+                            break Err(e); // e is already CancelError
+                        }
+                    }
+                    break Ok(());
+                }
+                Err(e) if attempt < MAX_PUBLISH_RETRIES => {
+                    tracing::warn!(
+                        instance_id = %instance_id,
+                        attempt,
+                        error = %e,
+                        "publish failed, retrying in {}ms",
+                        backoff_ms
+                    );
+                    tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                    backoff_ms *= BACKOFF_MULTIPLIER;
+                    last_err = Some(e);
+                    attempt += 1;
+                }
+                Err(e) => {
+                    // Final attempt failed - try outbox fallback
+                    tracing::error!(
+                        instance_id = %instance_id,
+                        attempt,
+                        error = %e,
+                        "all publish retries exhausted"
+                    );
+                    last_err = Some(e);
+
+                    // Try to drain outbox first to make room
+                    if !state.outbox.is_empty() {
+                        if let Err(e) = drain_outbox(state, store_ref).await {
+                            break Err(e); // e is already CancelError
+                        }
+                    }
+
+                    // Now try outbox fallback
+                    if state.outbox.len() >= OUTBOX_CAPACITY {
+                        break Err(CancelError::OutboxFull(OUTBOX_CAPACITY));
+                    }
+                    state.outbox.push(event.clone());
+
+                    // Last resort: try publish one more time after outbox drain
+                    match store_ref.publish(&namespace, &instance_id, event).await {
+                        Ok(_) => {
+                            // Success after outbox fallback
+                            if let Err(e) = drain_outbox(state, store_ref).await {
+                                break Err(e); // e is already CancelError
+                            }
+                            break Ok(());
+                        }
+                        Err(e) => {
+                            break Err(CancelError::PublishFailed(MAX_PUBLISH_RETRIES, e));
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // No store - store in outbox for later recovery
+        state.outbox.push(event);
+        Ok(())
+    };
+
+    if let Err(CancelError::OutboxFull(_)) = publish_result {
+        // This should never happen with proper sizing - fail fast
+        tracing::error!(
+            instance_id = %state.args.instance_id,
+            "outbox overflow during cancellation - bug in sizing"
+        );
+        // Do not stop the actor - let it be rescued by recovery
+        let _ = reply.send(Err(WtfError::sled_error("outbox overflow during cancel")));
+        return Err(ActorProcessingErr::from("outbox overflow during cancel"));
+    }
+
+    match publish_result {
+        Ok(_) => {
+            tracing::debug!(instance_id = %state.args.instance_id, "InstanceCancelled persisted");
+        }
+        Err(CancelError::ActorNotRunning) => {
+            // Actor already dead - this is fine for idempotent cancel
+            tracing::debug!(instance_id = %state.args.instance_id, "actor already stopped");
+        }
+        Err(e) => {
+            // Data loss scenario - log but do not fail
             tracing::error!(
                 instance_id = %state.args.instance_id,
                 error = %e,
-                "failed to persist InstanceCancelled event — \
-                 recovery may resurrect this workflow"
+                "cancellation event loss - recovery may resurrect workflow"
             );
         }
     }
 
     let _ = reply.send(Ok(()));
     myself_ref.stop(Some(reason));
+    Ok(())
+}
+
+/// Drain events from outbox to the store.
+async fn drain_outbox(
+    state: &mut InstanceState,
+    store: &dyn EventStore,
+) -> Result<(), CancelError> {
+    let namespace = state.args.namespace.clone();
+    let instance_id = state.args.instance_id.clone();
+
+    let events = state.outbox.drain(..).collect::<Vec<_>>();
+    for event in events {
+        store
+            .publish(&namespace, &instance_id, event)
+            .await
+            .map_err(CancelError::OutboxDrainFailed)?;
+    }
     Ok(())
 }
 

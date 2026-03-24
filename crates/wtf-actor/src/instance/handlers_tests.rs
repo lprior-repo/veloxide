@@ -980,14 +980,14 @@ async fn spawn_silent_cancel_actor() -> ActorRef<InstanceMsg> {
 
 #[tokio::test]
 async fn terminate_running_instance_returns_ok() {
-    let state = cancel_test_state(Some(Arc::new(MockOkEventStore)));
+    let mut state = cancel_test_state(Some(Arc::new(MockOkEventStore)));
     let actor_ref = spawn_null_instance_actor().await;
 
     let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WtfError>>();
 
     handlers::handle_cancel(
         actor_ref.clone(),
-        &state,
+        &mut state,
         "api-terminate".to_string(),
         tx.into(),
     )
@@ -1003,14 +1003,14 @@ async fn terminate_running_instance_returns_ok() {
 #[tokio::test]
 async fn terminate_publishes_instance_cancelled_event() {
     let store = Arc::new(CapturingEventStore::new());
-    let state = cancel_test_state(Some(store.clone() as Arc<dyn EventStore>));
+    let mut state = cancel_test_state(Some(store.clone() as Arc<dyn EventStore>));
     let actor_ref = spawn_null_instance_actor().await;
 
     let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WtfError>>();
 
     handlers::handle_cancel(
         actor_ref.clone(),
-        &state,
+        &mut state,
         "api-terminate".to_string(),
         tx.into(),
     )
@@ -1076,13 +1076,13 @@ async fn terminate_nonexistent_instance_returns_not_found() {
 #[tokio::test]
 async fn double_terminate_returns_not_found() {
     // First terminate: use a real actor that will be stopped by handle_cancel
-    let state = cancel_test_state(Some(Arc::new(MockOkEventStore)));
+    let mut state = cancel_test_state(Some(Arc::new(MockOkEventStore)));
     let actor_ref = spawn_null_instance_actor().await;
 
     let (tx1, rx1) = tokio::sync::oneshot::channel::<Result<(), WtfError>>();
     handlers::handle_cancel(
         actor_ref.clone(),
-        &state,
+        &mut state,
         "api-terminate".to_string(),
         tx1.into(),
     )
@@ -1152,14 +1152,14 @@ async fn terminate_returns_timeout_when_instance_does_not_respond() {
 
 #[tokio::test]
 async fn terminate_with_no_event_store_still_replies_ok() {
-    let state = cancel_test_state(None);
+    let mut state = cancel_test_state(None);
     let actor_ref = spawn_null_instance_actor().await;
 
     let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WtfError>>();
 
     handlers::handle_cancel(
         actor_ref.clone(),
-        &state,
+        &mut state,
         "no-store".to_string(),
         tx.into(),
     )
@@ -1180,14 +1180,14 @@ async fn terminate_with_no_event_store_still_replies_ok() {
 
 #[tokio::test]
 async fn terminate_when_publish_fails_still_replies_ok() {
-    let state = cancel_test_state(Some(Arc::new(FailingEventStore)));
+    let mut state = cancel_test_state(Some(Arc::new(FailingEventStore)));
     let actor_ref = spawn_null_instance_actor().await;
 
     let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WtfError>>();
 
     handlers::handle_cancel(
         actor_ref.clone(),
-        &state,
+        &mut state,
         "publish-fail".to_string(),
         tx.into(),
     )
@@ -1232,13 +1232,13 @@ impl EventStore for FailingEventStore {
 #[tokio::test]
 async fn terminate_reason_propagates_to_instance_cancelled_event() {
     let store = Arc::new(CapturingEventStore::new());
-    let state = cancel_test_state(Some(store.clone() as Arc<dyn EventStore>));
+    let mut state = cancel_test_state(Some(store.clone() as Arc<dyn EventStore>));
     let actor_ref = spawn_null_instance_actor().await;
 
     let custom_reason = "my-custom-reason".to_string();
     let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WtfError>>();
 
-    handlers::handle_cancel(actor_ref, &state, custom_reason.clone(), tx.into())
+    handlers::handle_cancel(actor_ref, &mut state, custom_reason.clone(), tx.into())
         .await
         .expect("handle_cancel ok");
 
