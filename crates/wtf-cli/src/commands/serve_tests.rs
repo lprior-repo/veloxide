@@ -124,3 +124,45 @@ async fn drain_runtime_propagates_worker_error() {
         "expected 'worker boom' in error chain, got: {err_msg}"
     );
 }
+
+#[tokio::test]
+async fn load_definitions_from_kv_reads_definitions() {
+    let client = match async_nats::connect("nats://127.0.0.1:4222").await {
+        Ok(c) => c,
+        Err(_) => {
+            println!("skipping test, NATS not running");
+            return;
+        }
+    };
+    
+    let js = async_nats::jetstream::new(client);
+    
+    // Create a temporary test bucket
+    let bucket_name = format!("wtf-def-test-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+    let kv = js.create_key_value(async_nats::jetstream::kv::Config {
+        bucket: bucket_name.clone(),
+        ..Default::default()
+    }).await.expect("create kv");
+
+    // Put a valid definition
+    let def = wtf_common::WorkflowDefinition {
+        paradigm: wtf_common::WorkflowParadigm::Fsm,
+        graph_raw: r#"{"nodes":[],"edges":[]}"#.to_string(),
+        description: Some("test".to_string()),
+    };
+    kv.put("test_wf", serde_json::to_vec(&def).unwrap().into()).await.expect("put");
+
+    // Put an invalid definition
+    kv.put("invalid_wf", "not json".into()).await.expect("put");
+
+    // Load definitions
+    let defs = super::load_definitions_from_kv(&kv).await.expect("load");
+
+    // Should only have the valid one
+    assert_eq!(defs.len(), 1);
+    assert_eq!(defs[0].0, "test_wf");
+    assert_eq!(defs[0].1.paradigm, wtf_common::WorkflowParadigm::Fsm);
+
+    // Cleanup
+    js.delete_key_value(bucket_name).await.ok();
+}

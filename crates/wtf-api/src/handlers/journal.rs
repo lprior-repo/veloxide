@@ -51,7 +51,14 @@ pub async fn get_journal(
 
     loop {
         match replay.next_event().await {
-            Ok(ReplayBatch::Event(replayed)) => entries.push(map_replayed_event(replayed)),
+            Ok(ReplayBatch::Event(replayed)) => {
+                match map_replayed_event(replayed) {
+                    Ok(entry) => entries.push(entry),
+                    Err(err) => {
+                        return (StatusCode::INTERNAL_SERVER_ERROR, Json(err)).into_response();
+                    }
+                }
+            }
             Ok(ReplayBatch::TailReached) => break,
             Err(error) => {
                 return (
@@ -87,12 +94,14 @@ fn parse_journal_request_id(
     }
 }
 
-fn map_replayed_event(replayed: ReplayedEvent) -> JournalEntry {
-    let (entry_type, name, input, output, duration_ms, status) = map_event_fields(&replayed.event);
+fn map_replayed_event(replayed: ReplayedEvent) -> Result<JournalEntry, ApiError> {
+    let (entry_type, name, input, output, duration_ms, status) = map_event_fields(&replayed.event)?;
 
-    let seq = u32::try_from(replayed.seq).unwrap_or(u32::MAX);
+    let seq = u32::try_from(replayed.seq).map_err(|_| {
+        ApiError::new("journal_error", format!("sequence number {} too large", replayed.seq))
+    })?;
 
-    JournalEntry {
+    Ok(JournalEntry {
         seq,
         entry_type,
         name,
@@ -102,89 +111,110 @@ fn map_replayed_event(replayed: ReplayedEvent) -> JournalEntry {
         duration_ms,
         fire_at: None,
         status,
-    }
+    })
 }
 
 fn map_event_fields(
     event: &WorkflowEvent,
-) -> (
-    JournalEntryType,
-    Option<String>,
-    Option<serde_json::Value>,
-    Option<serde_json::Value>,
-    Option<u64>,
-    Option<String>,
-) {
+) -> Result<
+    (
+        JournalEntryType,
+        Option<String>,
+        Option<serde_json::Value>,
+        Option<serde_json::Value>,
+        Option<u64>,
+        Option<String>,
+    ),
+    ApiError,
+> {
     match event {
         WorkflowEvent::ActivityDispatched {
             activity_type,
             payload,
             ..
-        } => (
+        } => Ok((
             JournalEntryType::Run,
             Some(activity_type.clone()),
-            serde_json::from_slice::<serde_json::Value>(payload.as_ref()).ok(),
+            if payload.is_empty() {
+                None
+            } else {
+                Some(serde_json::from_slice::<serde_json::Value>(payload.as_ref()).map_err(|e| {
+                    ApiError::new("journal_error", format!("failed to deserialize payload: {}", e))
+                })?)
+            },
             None,
             None,
             Some("dispatched".to_owned()),
-        ),
+        )),
         WorkflowEvent::ActivityCompleted {
             activity_id,
             result,
             duration_ms,
-        } => (
+        } => Ok((
             JournalEntryType::Run,
             Some(activity_id.clone()),
             None,
-            serde_json::from_slice::<serde_json::Value>(result.as_ref()).ok(),
+            if result.is_empty() {
+                None
+            } else {
+                Some(serde_json::from_slice::<serde_json::Value>(result.as_ref()).map_err(|e| {
+                    ApiError::new("journal_error", format!("failed to deserialize result: {}", e))
+                })?)
+            },
             Some(*duration_ms),
             Some("completed".to_owned()),
-        ),
+        )),
         WorkflowEvent::ActivityFailed {
             activity_id, error, ..
-        } => (
+        } => Ok((
             JournalEntryType::Run,
             Some(activity_id.clone()),
             None,
             Some(serde_json::json!({ "error": error })),
             None,
             Some("failed".to_owned()),
-        ),
-        WorkflowEvent::TimerScheduled { timer_id, fire_at } => (
+        )),
+        WorkflowEvent::TimerScheduled { timer_id, fire_at } => Ok((
             JournalEntryType::Wait,
             Some(timer_id.clone()),
             None,
             Some(serde_json::json!({ "fire_at": fire_at.to_rfc3339() })),
             None,
             Some("scheduled".to_owned()),
-        ),
-        WorkflowEvent::TimerFired { timer_id } => (
+        )),
+        WorkflowEvent::TimerFired { timer_id } => Ok((
             JournalEntryType::Wait,
             Some(timer_id.clone()),
             None,
             None,
             None,
             Some("fired".to_owned()),
-        ),
+        )),
         WorkflowEvent::SignalReceived {
             signal_name,
             payload,
-        } => (
+        } => Ok((
             JournalEntryType::Run,
             Some(signal_name.clone()),
-            serde_json::from_slice::<serde_json::Value>(payload.as_ref()).ok(),
+            if payload.is_empty() {
+                None
+            } else {
+                Some(serde_json::from_slice::<serde_json::Value>(payload.as_ref()).map_err(|e| {
+                    ApiError::new("journal_error", format!("failed to deserialize payload: {}", e))
+                })?)
+            },
             None,
             None,
             Some("signal".to_owned()),
-        ),
-        _ => (
+        )),
+        _ => Ok((
             JournalEntryType::Run,
             Some("event".to_owned()),
             None,
             None,
             None,
             Some("recorded".to_owned()),
-        ),
+        )),
     }
 }
 

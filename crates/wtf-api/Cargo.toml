@@ -47,3 +47,4 @@ sled = "0.34"
 tempfile = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 hyper = { version = "1", features = ["full"] }
+async-trait.workspace = true

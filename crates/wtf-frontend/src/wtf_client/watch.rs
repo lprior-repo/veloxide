@@ -227,6 +227,7 @@ fn upsert_instance(current: Vec<InstanceView>, next: InstanceView) -> Vec<Instan
     merged
 }
 
+#[allow(clippy::unused_async)]
 async fn sleep_for(duration: Duration) {
     #[cfg(target_arch = "wasm32")]
     {

@@ -65,9 +65,10 @@ mod tests {
         let mut registry = WorkflowRegistry::new();
         let def = make_test_definition(WorkflowParadigm::Fsm);
         registry.register_definition("checkout", def.clone());
-        let retrieved = registry.get_definition("checkout");
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().paradigm, WorkflowParadigm::Fsm);
+        let Some(retrieved) = registry.get_definition("checkout") else {
+            panic!("Missing definition")
+        };
+        assert_eq!(retrieved.paradigm, WorkflowParadigm::Fsm);
     }
 
     #[test]
@@ -100,7 +101,9 @@ mod tests {
         registry.register_definition("wf", make_test_definition(WorkflowParadigm::Fsm));
         let dag_def = make_test_definition(WorkflowParadigm::Dag);
         registry.register_definition("wf", dag_def);
-        let retrieved = registry.get_definition("wf").unwrap();
+        let Some(retrieved) = registry.get_definition("wf") else {
+            panic!("Missing definition")
+        };
         assert_eq!(retrieved.paradigm, WorkflowParadigm::Dag);
     }
 }

@@ -84,7 +84,7 @@ async fn handle_now_does_not_reply_when_publish_fails() {
     let mut state = test_state_with_failing_store();
     let (tx, rx) = tokio::sync::oneshot::channel::<chrono::DateTime<chrono::Utc>>();
 
-    handle_now(&mut state, 0, tx.into()).await;
+    let _ = handle_now(&mut state, 0, tx.into()).await;
 
     // rx should be closed (dropped) — not received — because the value wasn't persisted
     let result = tokio::time::timeout(std::time::Duration::from_millis(10), rx).await;

@@ -238,7 +238,6 @@ pub(crate) async fn handle_cancel(
 
         // Retry loop with exponential backoff
         let mut backoff_ms = INITIAL_BACKOFF_MS;
-        let mut last_err = None;
 
         let mut attempt = 1;
         loop {
@@ -262,7 +261,6 @@ pub(crate) async fn handle_cancel(
                     );
                     tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
                     backoff_ms *= BACKOFF_MULTIPLIER;
-                    last_err = Some(e);
                     attempt += 1;
                 }
                 Err(e) => {
@@ -273,7 +271,6 @@ pub(crate) async fn handle_cancel(
                         error = %e,
                         "all publish retries exhausted"
                     );
-                    last_err = Some(e);
 
                     // Try to drain outbox first to make room
                     if !state.outbox.is_empty() {

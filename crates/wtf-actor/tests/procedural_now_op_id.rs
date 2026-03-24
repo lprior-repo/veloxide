@@ -129,7 +129,7 @@ async fn handle_now_returns_checkpointed_value_when_called_for_op1_but_op_counte
     // executing the now() call at op_id=1. But s.operation_counter=2 (two dispatches applied).
     // handle_now must use operation_id=1 (caller's op) not s.operation_counter=2.
     let (tx, rx) = tokio::sync::oneshot::channel::<chrono::DateTime<chrono::Utc>>();
-    handle_now(&mut state, 1, tx.into()).await;
+    let _ = handle_now(&mut state, 1, tx.into()).await;
     let returned_ts = rx.await.expect("reply");
 
     assert_eq!(
