@@ -1,4 +1,0 @@
-Error: task_runner::run_failed
-
-  × Task root:fmt failed to run.
-  ╰─▶ Process /usr/bin/cargo failed: exit code 1

@@ -37,12 +37,72 @@
           "$ref": "#/definitions/ProtoConfig"
         }
       ]
+    },
+    "rust": {
+      "title": "rust",
+      "description": "Configures and enables the Rust toolchain. Docs: https://moonrepo.dev/docs/config/toolchain#rust",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RustToolchainConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "additionalProperties": {
     "$ref": "#/definitions/ToolchainPluginConfig"
   },
   "definitions": {
+    "BinConfig": {
+      "description": "Configures to a tool-specific global binary to install.",
+      "type": "object",
+      "properties": {
+        "bin": {
+          "title": "bin",
+          "description": "Name of the binary, with optional version separated by @.",
+          "type": "string",
+          "markdownDescription": "Name of the binary, with optional version separated by `@`."
+        },
+        "force": {
+          "title": "force",
+          "description": "Force install the binary if it already exists.",
+          "type": "boolean"
+        },
+        "local": {
+          "title": "local",
+          "description": "Only install the binary locally, and not within CI.",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "name",
+          "description": "For supported tools, a custom name to use.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "markdownDescription": "Configures to a tool-specific global binary to install."
+    },
+    "BinEntry": {
+      "description": "Configures to a tool-specific global binary to install.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/BinConfig"
+        }
+      ],
+      "markdownDescription": "Configures to a tool-specific global binary to install."
+    },
     "ExtendsFrom": {
       "anyOf": [
         {
@@ -94,6 +154,78 @@
               "$ref": "#/definitions/VersionSpec"
             }
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RustToolchainConfig": {
+      "description": "Configures and enables the Rust toolchain. Docs: https://moonrepo.dev/docs/config/toolchain#rust",
+      "type": "object",
+      "properties": {
+        "addMsrvConstraint": {
+          "title": "addMsrvConstraint",
+          "description": "When version is defined, syncs the version as a constraint to Cargo.toml under the workspace.package.rust-version or package.rust-version fields.",
+          "type": "boolean",
+          "markdownDescription": "When `version` is defined, syncs the version as a constraint to `Cargo.toml` under the `workspace.package.rust-version` or `package.rust-version` fields."
+        },
+        "bins": {
+          "title": "bins",
+          "description": "List of binaries to install into the environment using cargo binstall.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BinEntry"
+          },
+          "markdownDescription": "List of binaries to install into the environment using `cargo binstall`."
+        },
+        "binstallVersion": {
+          "title": "binstallVersion",
+          "description": "The fully-qualified version of cargo-binstall to install. Defaults to \"latest\" if not defined.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "markdownDescription": "The fully-qualified version of `cargo-binstall` to install. Defaults to \"latest\" if not defined."
+        },
+        "components": {
+          "title": "components",
+          "description": "List of Rust components to automatically install with rustup.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "List of Rust components to automatically install with `rustup`."
+        },
+        "syncToolchainConfig": {
+          "title": "syncToolchainConfig",
+          "description": "When version is defined, syncs the version to rust-toolchain.toml under the toolchain.channel field.",
+          "type": "boolean",
+          "markdownDescription": "When `version` is defined, syncs the version to `rust-toolchain.toml` under the `toolchain.channel` field."
+        },
+        "targets": {
+          "title": "targets",
+          "description": "List of Rust targets to automatically install with rustup.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "List of Rust targets to automatically install with `rustup`."
+        },
+        "version": {
+          "title": "version",
+          "description": "Configured version (channel) to download and install with rustup.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UnresolvedVersionSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "markdownDescription": "Configured version (channel) to download and install with `rustup`."
         }
       },
       "additionalProperties": false

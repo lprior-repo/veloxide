@@ -1,4 +1,0 @@
-
-[31mERROR[0m [33mdx serve[0m: Failed to find binary package to build.
-You need to either run dx from inside a binary crate or specify a binary package to build with the `--package` flag. Try building again with one of the binary packages in the workspace:
-- diagram_tool

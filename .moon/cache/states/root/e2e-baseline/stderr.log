@@ -1,1 +1,0 @@
-[ WARN 2026-03-18 17:37:52.752] moon_task_hasher::task_hasher  Attempted to hash input .fastembed_cache but it does not exist, skipping 
