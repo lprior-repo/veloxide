@@ -13,6 +13,8 @@ mod handlers_tests;
 pub mod init;
 #[cfg(test)]
 mod init_tests;
+#[cfg(test)]
+mod init_red_queen_tests;
 pub mod lifecycle;
 pub mod procedural;
 pub mod procedural_utils;

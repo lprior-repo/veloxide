@@ -20,7 +20,10 @@ pub async fn load_initial_state(
         if let Ok(Some(snap)) = wtf_storage::snapshots::read_snapshot(db, &args.instance_id) {
             state.paradigm_state = deserialize_paradigm_state(args.paradigm, &snap.state_bytes)?;
             state.total_events_applied = snap.seq;
-            from_seq = snap.seq + 1;
+            from_seq = snap
+                .seq
+                .checked_add(1)
+                .ok_or_else(|| ActorProcessingErr::from("Snapshot sequence overflow"))?;
             tracing::info!(instance_id = %args.instance_id, seq = snap.seq, "Snapshot loaded");
         }
     }
@@ -173,10 +176,16 @@ pub async fn publish_instance_started(
         input: args.input.clone(),
     };
 
-    store
+    let seq = store
         .publish(&args.namespace, &args.instance_id, event)
         .await
         .map_err(|e| ActorProcessingErr::from(Box::new(e)))?;
+
+    debug_assert!(
+        seq >= 1,
+        "EventStore returned invalid sequence number: {} (must be >= 1)",
+        seq
+    );
 
     tracing::info!(
         instance_id = %args.instance_id,
@@ -188,5 +197,7 @@ pub async fn publish_instance_started(
 
 #[must_use]
 pub fn should_skip_instance_started(from_seq: u64, event_log: &[WorkflowEvent]) -> bool {
-    from_seq > 1 || !event_log.is_empty()
+    // from_seq == 0 is invalid: treat as skip to avoid blocking recovery
+    // (DEFECT-2: explicit handling of illegal value)
+    from_seq == 0 || from_seq > 1 || !event_log.is_empty()
 }
