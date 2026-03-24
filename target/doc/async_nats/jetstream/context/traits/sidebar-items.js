@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"trait":["ClientProvider","Publisher","RequestSender","Requester","TimeoutProvider"]};

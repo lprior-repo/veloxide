@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["exit_after","kill_after","send_after","send_interval"]};

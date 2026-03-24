@@ -121,7 +121,7 @@ pub async fn list_workflows(
 
 #[cfg(test)]
 mod tests {
-    use super::super::{parse_paradigm, paradigm_to_str, split_path_id};
+    use super::super::{paradigm_to_str, parse_paradigm, split_path_id};
     use wtf_common::WorkflowParadigm;
 
     #[test]

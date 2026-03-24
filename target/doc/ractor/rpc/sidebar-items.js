@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["call","call_and_forward","cast","multi_call"],"mod":["call_result"]};

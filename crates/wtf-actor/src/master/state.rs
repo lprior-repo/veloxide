@@ -76,6 +76,19 @@ impl OrchestratorState {
         self.active.len() < self.config.max_instances
     }
 
+    /// Returns `true` when `self.active.len() < self.config.max_instances`.
+    ///
+    /// This method is **pure** — it performs no state mutation.
+    ///
+    /// # Contract
+    ///
+    /// - Returns `true` iff `active.len() < max_instances` (capacity available)
+    /// - Returns `false` iff `active.len() >= max_instances` (at limit)
+    #[must_use]
+    pub fn capacity_check(&self) -> bool {
+        self.active.len() < self.config.max_instances
+    }
+
     /// Register a newly spawned instance.
     pub fn register(&mut self, id: InstanceId, actor_ref: ActorRef<InstanceMsg>) {
         self.active.insert(id, actor_ref);

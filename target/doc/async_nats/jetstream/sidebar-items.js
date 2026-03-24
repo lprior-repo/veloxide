@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["new","with_domain","with_prefix"],"mod":["account","consumer","context","kv","message","object_store","publish","response","stream"],"struct":["Error","ErrorCode"]};

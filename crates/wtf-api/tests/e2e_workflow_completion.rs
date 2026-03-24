@@ -85,10 +85,7 @@ async fn boot_server() -> Result<E2eTestServer, Box<dyn std::error::Error>> {
     let guard = global_test_lock().lock_owned().await;
 
     let config = NatsConfig {
-        urls: vec![
-            std::env::var("NATS_URL")
-                .unwrap_or_else(|_| "nats://127.0.0.1:4222".into()),
-        ],
+        urls: vec![std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".into())],
         embedded: false,
         connect_timeout_ms: 5_000,
         credentials_path: None,
@@ -120,8 +117,7 @@ async fn boot_server() -> Result<E2eTestServer, Box<dyn std::error::Error>> {
         definitions: Vec::new(),
     };
 
-    let (master, _handle) =
-        ractor::Actor::spawn(None, MasterOrchestrator, orch_config).await?;
+    let (master, _handle) = ractor::Actor::spawn(None, MasterOrchestrator, orch_config).await?;
 
     let kv = provision_kv_buckets(&js).await?;
     let app = wtf_api::app::build_app(master.clone(), kv);
@@ -156,7 +152,12 @@ async fn reset_all_streams(js: &async_nats::jetstream::Context) {
     for name in ["wtf-events", "wtf-work", "wtf-signals", "wtf-archive"] {
         let _ = js.delete_stream(name).await;
     }
-    for name in ["wtf-instances", "wtf-timers", "wtf-definitions", "wtf-heartbeats"] {
+    for name in [
+        "wtf-instances",
+        "wtf-timers",
+        "wtf-definitions",
+        "wtf-heartbeats",
+    ] {
         let _ = js.delete_key_value(name).await;
     }
 }
@@ -179,7 +180,11 @@ impl E2eTestServer {
             .json(&body)
             .send()
             .await?;
-        assert_eq!(resp.status(), StatusCode::OK, "definition ingestion should return 200");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "definition ingestion should return 200"
+        );
         Ok(resp.json().await?)
     }
 
@@ -276,9 +281,7 @@ impl E2eTestServer {
         }
     }
 
-    async fn list_workflows(
-        &self,
-    ) -> Result<Vec<V3StatusResponse>, Box<dyn std::error::Error>> {
+    async fn list_workflows(&self) -> Result<Vec<V3StatusResponse>, Box<dyn std::error::Error>> {
         let resp = self
             .http_client
             .get(format!("{}/api/v1/workflows", self.base_url))
@@ -290,9 +293,14 @@ impl E2eTestServer {
 }
 
 fn verify_seq_ascending(entries: &[JournalEntryDto]) {
-    entries
-        .windows(2)
-        .for_each(|w| assert!(w[0].seq < w[1].seq, "journal entries must be strictly ascending by seq: {} >= {}", w[0].seq, w[1].seq));
+    entries.windows(2).for_each(|w| {
+        assert!(
+            w[0].seq < w[1].seq,
+            "journal entries must be strictly ascending by seq: {} >= {}",
+            w[0].seq,
+            w[1].seq
+        )
+    });
 }
 
 const CLEAN_PROCEDURAL_SOURCE: &str = r#"
@@ -307,14 +315,18 @@ impl WorkflowFn for EchoWorkflow {
 // ── Scenario 1: Definition ingestion returns valid for clean procedural source ─
 
 #[tokio::test]
-async fn e2e_definition_ingestion_returns_valid_for_clean_procedural_source() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn e2e_definition_ingestion_returns_valid_for_clean_procedural_source(
+) -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let result = server
         .ingest_definition(CLEAN_PROCEDURAL_SOURCE, "echo")
         .await?;
 
-    assert!(result.valid, "definition should be valid, diagnostics: {:?}", result.diagnostics);
+    assert!(
+        result.valid,
+        "definition should be valid, diagnostics: {:?}",
+        result.diagnostics
+    );
     assert!(
         result.diagnostics.is_empty(),
         "clean source should produce no diagnostics"
@@ -325,7 +337,8 @@ async fn e2e_definition_ingestion_returns_valid_for_clean_procedural_source() ->
 // ── Scenario 2: Start workflow returns 201 with instance_id ───────────────
 
 #[tokio::test]
-async fn e2e_start_workflow_returns_201_with_instance_id() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_start_workflow_returns_201_with_instance_id() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = boot_server().await?;
     let resp = server
         .start_workflow("e2e", "echo", "procedural", serde_json::json!({}), None)
@@ -333,19 +346,30 @@ async fn e2e_start_workflow_returns_201_with_instance_id() -> Result<(), Box<dyn
 
     assert_eq!(resp.status(), StatusCode::CREATED);
     let body: V3StartResponse = resp.json().await?;
-    assert!(!body.instance_id.is_empty(), "instance_id should be non-empty");
-    assert_eq!(body.instance_id.len(), 26, "instance_id should be 26-char ULID");
+    assert!(
+        !body.instance_id.is_empty(),
+        "instance_id should be non-empty"
+    );
+    assert_eq!(
+        body.instance_id.len(),
+        26,
+        "instance_id should be 26-char ULID"
+    );
     assert_eq!(body.workflow_type, "echo");
 
     // C1: namespace is always "" in start response (workflow_mappers.rs:62)
-    assert_eq!(body.namespace, "", "start response namespace is always empty");
+    assert_eq!(
+        body.namespace, "",
+        "start response namespace is always empty"
+    );
     Ok(())
 }
 
 // ── Scenario 3: Journal contains entries after workflow start ─────────────
 
 #[tokio::test]
-async fn e2e_journal_contains_entries_after_workflow_start() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_journal_contains_entries_after_workflow_start(
+) -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let resp = server
         .start_workflow("e2e", "echo", "procedural", serde_json::json!({}), None)
@@ -364,10 +388,7 @@ async fn e2e_journal_contains_entries_after_workflow_start() -> Result<(), Box<d
     );
 
     // At least one entry should have a timestamp
-    let has_timestamp = journal
-        .entries
-        .iter()
-        .any(|e| e.timestamp.is_some());
+    let has_timestamp = journal.entries.iter().any(|e| e.timestamp.is_some());
     assert!(has_timestamp, "at least one entry should have a timestamp");
 
     Ok(())
@@ -393,7 +414,10 @@ async fn e2e_workflow_status_returns_matching_response() -> Result<(), Box<dyn s
     assert_eq!(status.workflow_type, "echo");
     assert_eq!(status.paradigm, "procedural");
     assert_eq!(status.phase, "live");
-    assert!(status.events_applied >= 1, "should have at least 1 event applied");
+    assert!(
+        status.events_applied >= 1,
+        "should have at least 1 event applied"
+    );
     assert!(status.current_state.is_none());
     Ok(())
 }
@@ -413,9 +437,7 @@ async fn e2e_list_workflows_includes_started_instance() -> Result<(), Box<dyn st
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let list = server.list_workflows().await?;
-    let found = list
-        .iter()
-        .any(|w| w.instance_id == start.instance_id);
+    let found = list.iter().any(|w| w.instance_id == start.instance_id);
     assert!(found, "list should contain the started instance");
     Ok(())
 }
@@ -426,7 +448,13 @@ async fn e2e_list_workflows_includes_started_instance() -> Result<(), Box<dyn st
 async fn e2e_invalid_paradigm_returns_400() -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let resp = server
-        .start_workflow("e2e", "bad", "quantum_computing", serde_json::json!({}), None)
+        .start_workflow(
+            "e2e",
+            "bad",
+            "quantum_computing",
+            serde_json::json!({}),
+            None,
+        )
         .await?;
 
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
@@ -438,7 +466,8 @@ async fn e2e_invalid_paradigm_returns_400() -> Result<(), Box<dyn std::error::Er
 // ── Scenario 7: Empty paradigm returns 400 invalid_paradigm ───────────────
 
 #[tokio::test]
-async fn e2e_empty_paradigm_returns_400_invalid_paradigm() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_empty_paradigm_returns_400_invalid_paradigm() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = boot_server().await?;
     let resp = server
         .start_workflow("e2e", "echo", "", serde_json::json!({}), None)
@@ -456,7 +485,13 @@ async fn e2e_empty_paradigm_returns_400_invalid_paradigm() -> Result<(), Box<dyn
 async fn e2e_invalid_namespace_returns_400() -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let resp = server
-        .start_workflow("has spaces!", "bad", "procedural", serde_json::json!({}), None)
+        .start_workflow(
+            "has spaces!",
+            "bad",
+            "procedural",
+            serde_json::json!({}),
+            None,
+        )
         .await?;
 
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
@@ -468,7 +503,8 @@ async fn e2e_invalid_namespace_returns_400() -> Result<(), Box<dyn std::error::E
 // ── Scenario 9: Definition with empty workflow_type returns 400 ───────────
 
 #[tokio::test]
-async fn e2e_definition_with_empty_workflow_type_returns_400() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_definition_with_empty_workflow_type_returns_400(
+) -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let body = serde_json::json!({
         "source": "fn valid() {}",
@@ -490,7 +526,8 @@ async fn e2e_definition_with_empty_workflow_type_returns_400() -> Result<(), Box
 // ── Scenario 10: Definition with malformed source returns 400 ─────────────
 
 #[tokio::test]
-async fn e2e_definition_with_malformed_source_returns_400() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_definition_with_malformed_source_returns_400() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = boot_server().await?;
     let body = serde_json::json!({
         "source": "!!!not valid rust syntax",
@@ -512,13 +549,16 @@ async fn e2e_definition_with_malformed_source_returns_400() -> Result<(), Box<dy
 // ── Scenario 11: Definition with lint errors returns 200 { valid: false } ─
 
 #[tokio::test]
-async fn e2e_definition_with_lint_errors_returns_200_valid_false() -> Result<(), Box<dyn std::error::Error>>
-{
+async fn e2e_definition_with_lint_errors_returns_200_valid_false(
+) -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let source = "impl WorkflowFn for BadWorkflow { async fn execute(&self, _ctx: WorkflowContext) -> anyhow::Result<()> { tokio::spawn(async {}); Ok(()) } }";
     let result = server.ingest_definition(source, "lint-violator").await?;
 
-    assert!(!result.valid, "definition with lint errors should not be valid");
+    assert!(
+        !result.valid,
+        "definition with lint errors should not be valid"
+    );
     assert!(
         !result.diagnostics.is_empty(),
         "lint errors should produce diagnostics"
@@ -566,13 +606,18 @@ async fn e2e_duplicate_instance_id_start_returns_409() -> Result<(), Box<dyn std
 // ── Scenario 13: Journal for non-existent instance returns empty ──────────
 
 #[tokio::test]
-async fn e2e_journal_for_nonexistent_instance_returns_empty() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_journal_for_nonexistent_instance_returns_empty(
+) -> Result<(), Box<dyn std::error::Error>> {
     let server = boot_server().await?;
     let encoded_id = "e2e%2Fnonexistent-id-12345";
     let url = format!("{}/api/v1/workflows/{encoded_id}/journal", server.base_url);
     let resp = server.http_client.get(&url).send().await?;
 
-    assert_eq!(resp.status(), StatusCode::OK, "journal returns 200 even for non-existent instance");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "journal returns 200 even for non-existent instance"
+    );
     let journal: JournalResponse = resp.json().await?;
     assert!(
         journal.entries.is_empty(),
@@ -584,7 +629,8 @@ async fn e2e_journal_for_nonexistent_instance_returns_empty() -> Result<(), Box<
 // ── Scenario 14: Status for non-existent instance returns 404 ─────────────
 
 #[tokio::test]
-async fn e2e_status_for_nonexistent_instance_returns_404() -> Result<(), Box<dyn std::error::Error>> {
+async fn e2e_status_for_nonexistent_instance_returns_404() -> Result<(), Box<dyn std::error::Error>>
+{
     let server = boot_server().await?;
     let encoded_id = "e2e%2Fnonexistent-id-12345";
     let url = format!("{}/api/v1/workflows/{encoded_id}", server.base_url);

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["WorkerMessage"],"struct":["DeadMansSwitchConfiguration","DeadMansSwitchConfigurationBuilder","WorkerProperties","WorkerStartContext"],"trait":["Worker","WorkerBuilder","WorkerCapacityController"]};

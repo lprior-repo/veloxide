@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["AckKind","StreamMessageErrorKind"],"struct":["Acker","Info","Message","OutboundMessage","PublishMessage","StreamMessage"],"type":["StreamMessageError"]};

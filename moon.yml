@@ -1,0 +1,205 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+tasks:
+  serve:
+    script: |
+      dx serve --platform web --port 8081
+    options:
+      cache: false
+
+  serve-e2e:
+    script: |
+      cd diagram_tool && dx serve --platform web --port 8081 --open false --watch false --hot-reload false --interactive false
+    options:
+      cache: false
+
+  check:
+    script: |
+      /usr/bin/cargo check
+
+  test-rust:
+    script: |
+      /usr/bin/cargo test
+
+  test:
+    script: |
+      moon run :test-rust
+      moon run :e2e
+
+  e2e-smoke:
+    script: |
+      moon run :build-web
+      npm exec -- playwright test --project e2e-smoke
+    options:
+      cache: false
+
+  e2e-baseline:
+    script: |
+      moon run :build-web
+      npm exec -- playwright test --project baseline
+    options:
+      cache: false
+
+  e2e-seeded:
+    script: |
+      moon run :build-web
+      npm exec -- playwright test --project redqueen-seeded --grep @rq
+    options:
+      cache: false
+
+  e2e-stress:
+    script: |
+      moon run :build-web
+      npm exec -- playwright test --project redqueen-stress
+    options:
+      cache: false
+
+  e2e-full:
+    script: |
+      moon run :build-web
+      npm exec -- playwright test
+    options:
+      cache: false
+
+  e2e:
+    script: |
+      moon run :e2e-baseline
+    options:
+      cache: false
+
+  e2e-hardening:
+    script: |
+      moon run :e2e-seeded
+      moon run :e2e-stress
+    options:
+      cache: false
+
+  clippy:
+    script: |
+      /usr/bin/cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
+
+  clippy-source:
+    script: |
+      /usr/bin/cargo clippy --lib --bins --all-features -- -D warnings -D clippy::pedantic -D clippy::nursery -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -F unsafe_code
+
+  arch-audit:
+    script: |
+      ./scripts/enforce_canonical_projection_types.sh
+      ./scripts/enforce_file_lengths.sh
+      ./scripts/enforce_boundaries.sh
+
+  ci-source:
+    script: |
+      moon run :fmt
+      moon run :clippy-source
+      moon run :arch-audit
+      moon run :test-rust
+
+  fmt:
+    script: |
+      /usr/bin/cargo fmt --check
+
+  build-web:
+    script: |
+      cd diagram_tool && dx build --platform web --release
+
+  bundle-web-optimized:
+    script: |
+      cd diagram_tool && dx bundle --release --base-path /Seshat/
+      if ! command -v wasm-opt &> /dev/null; then
+        echo "wasm-opt not found, downloading..."
+        wget https://github.com/WebAssembly/binaryen/releases/download/version_117/binaryen-version_117-x86_64-linux.tar.gz -O /tmp/binaryen.tar.gz
+        tar -xzf /tmp/binaryen.tar.gz -C /tmp
+        WASM_OPT="/tmp/binaryen-version_117/bin/wasm-opt"
+      else
+        WASM_OPT="wasm-opt"
+      fi
+      for file in dist/public/assets/*.wasm; do
+        $WASM_OPT -Oz "$file" -o "$file"
+        brotli -c -q 11 "$file" > "$file.br"
+      done
+    options:
+      cache: false
+
+  deploy-pages:
+    script: |
+      moon run :bundle-web-optimized
+      cd diagram_tool/dist/public
+      git init
+      git checkout -b gh-pages
+      git add -A
+      git commit -m "Deploy optimized WASM to GitHub Pages"
+      git push -f git@github.com:lprior-repo/Seshat.git gh-pages:gh-pages
+    options:
+      cache: false
+
+  build-web-dev:
+    script: |
+      dx build --platform web
+
+  coverage:
+    script: |
+      /usr/bin/cargo llvm-cov --summary-only
+
+  coverage-core:
+    script: |
+      /usr/bin/cargo llvm-cov --summary-only --ignore-filename-regex '(src/main.rs|src/bin/|src/ui/|src/hooks/)'
+
+  mutants:
+    command: "cargo mutants --in-place"
+    options:
+      cache: false
+
+  mutants-ci:
+    command: "cargo mutants --in-place --check"
+    options:
+      cache: false
+
+  mutants-list:
+    command: "cargo mutants --list --json"
+    options:
+      cache: false
+
+  mutants-quick:
+    command: "cargo mutants --in-place --shard 1/4"
+    options:
+      cache: false
+
+  ci:
+    script: |
+      moon run :check
+      moon run :clippy
+      moon run :test-rust
+      moon run :e2e-baseline
+
+  ci-hardening:
+    script: |
+      moon run :ci
+      moon run :e2e-hardening
+
+  ci-nightly:
+    script: |
+      moon run :ci-hardening
+      moon run :mutants-ci
+
+  agent-check:
+    script: |
+      cargo check -p dioxus-agent-rs
+
+  agent-clippy:
+    script: |
+      cargo clippy -p dioxus-agent-rs -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
+
+  agent-test:
+    script: |
+      cargo test -p dioxus-agent-rs
+
+  agent-build:
+    script: |
+      cargo build -p dioxus-agent-rs
+
+  agent-install-chrome:
+    script: |
+      which google-chrome || (apt-get update && apt-get install -y chromium)
+    options:
+      cache: false

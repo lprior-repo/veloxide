@@ -1,0 +1,373 @@
+▪▪▪▪ root:check (03196d6c)
+▪▪▪▪ root:check (4s 942ms, 03196d6c)
+▪▪▪▪ root:clippy (d6c4078a)
+▪▪▪▪ root:clippy (434ms, d6c4078a)
+▪▪▪▪ root:test-rust (40ec170d)
+▪▪▪▪ root:test-rust (9s 350ms, 40ec170d)
+▪▪▪▪ root:e2e-baseline
+▪▪▪▪ root:build-web (e1f911da)
+[2m   0.14s[0m [32m INFO[0m Building project...
+[2m   0.864s[0m [32m INFO[0m Compiled [  1/362]: build-script-build
+[2m   0.866s[0m [32m INFO[0m Compiled [  2/362]: build-script-build
+[2m   0.885s[0m [32m INFO[0m Compiled [  6/362]: build-script-build
+[2m   0.887s[0m [32m INFO[0m Compiled [  7/362]: build-script-build
+[2m   0.920s[0m [32m INFO[0m Compiled [  8/362]: build-script-build
+[2m   0.931s[0m [32m INFO[0m Compiled [ 10/362]: cfg_if
+[2m   0.963s[0m [32m INFO[0m Compiled [ 12/362]: unicode_ident
+[2m   0.984s[0m [32m INFO[0m Compiled [ 13/362]: once_cell
+[2m   0.992s[0m [32m INFO[0m Compiled [ 14/362]: build-script-build
+[2m   0.993s[0m [32m INFO[0m Compiled [ 15/362]: bumpalo
+[2m   1. 0s[0m [32m INFO[0m Compiled [ 17/362]: memchr
+[2m   1.15s[0m [32m INFO[0m Compiled [ 18/362]: version_check
+[2m   1.26s[0m [32m INFO[0m Compiled [ 19/362]: pin_project_lite
+[2m   1.63s[0m [32m INFO[0m Compiled [ 20/362]: smallvec
+[2m   1.81s[0m [32m INFO[0m Compiled [ 21/362]: build-script-build
+[2m   1.85s[0m [32m INFO[0m Compiled [ 22/362]: rustversion
+[2m   1.90s[0m [32m INFO[0m Compiled [ 23/362]: build-script-build
+[2m   1.109s[0m [32m INFO[0m Compiled [ 24/362]: unicode_ident
+[2m   1.126s[0m [32m INFO[0m Compiled [ 25/362]: wasm_bindgen_shared
+[2m   1.170s[0m [32m INFO[0m Compiled [ 26/362]: futures_core
+[2m   1.172s[0m [32m INFO[0m Compiled [ 27/362]: futures_sink
+[2m   1.172s[0m [32m INFO[0m Compiled [ 28/362]: autocfg
+[2m   1.187s[0m [32m INFO[0m Compiled [ 29/362]: slab
+[2m   1.205s[0m [32m INFO[0m Compiled [ 30/362]: futures_task
+[2m   1.226s[0m [32m INFO[0m Compiled [ 31/362]: build-script-build
+[2m   1.229s[0m [32m INFO[0m Compiled [ 32/362]: build-script-build
+[2m   1.235s[0m [32m INFO[0m Compiled [ 34/362]: futures_io
+[2m   1.246s[0m [32m INFO[0m Compiled [ 35/362]: serde_core
+[2m   1.248s[0m [32m INFO[0m Compiled [ 36/362]: wasm_bindgen_shared
+[2m   1.251s[0m [32m INFO[0m Compiled [ 37/362]: build-script-build
+[2m   1.266s[0m [32m INFO[0m Compiled [ 39/362]: build-script-build
+[2m   1.337s[0m [32m INFO[0m Compiled [ 42/362]: build-script-build
+[2m   1.360s[0m [32m INFO[0m Compiled [ 44/362]: scopeguard
+[2m   1.381s[0m [32m INFO[0m Compiled [ 47/362]: dioxus_core_types
+[2m   1.392s[0m [32m INFO[0m Compiled [ 48/362]: parking_lot_core
+[2m   1.417s[0m [32m INFO[0m Compiled [ 49/362]: futures_channel
+[2m   1.423s[0m [32m INFO[0m Compiled [ 50/362]: simd_adler32
+[2m   1.450s[0m [32m INFO[0m Compiled [ 51/362]: rustc_hash
+[2m   1.453s[0m [32m INFO[0m Compiled [ 52/362]: build-script-build
+[2m   1.457s[0m [32m INFO[0m Compiled [ 54/362]: tracing_core
+[2m   1.513s[0m [32m INFO[0m Compiled [ 55/362]: build-script-build
+[2m   1.520s[0m [32m INFO[0m Compiled [ 57/362]: build-script-build
+[2m   1.524s[0m [32m INFO[0m Compiled [ 58/362]: unicode_xid
+[2m   1.526s[0m [32m INFO[0m Compiled [ 59/362]: log
+[2m   1.526s[0m [32m INFO[0m Compiled [ 60/362]: arrayvec
+[2m   1.526s[0m [32m INFO[0m Compiled [ 61/362]: lock_api
+[2m   1.527s[0m [32m INFO[0m Compiled [ 62/362]: proc_macro2
+[2m   1.527s[0m [32m INFO[0m Compiled [ 63/362]: anyhow
+[2m   1.533s[0m [32m INFO[0m Compiled [ 64/362]: num_traits
+[2m   1.535s[0m [32m INFO[0m Compiled [ 65/362]: longest_increasing_subsequence
+[2m   1.541s[0m [32m INFO[0m Compiled [ 66/362]: adler2
+[2m   1.609s[0m [32m INFO[0m Compiled [ 67/362]: build-script-build
+[2m   1.651s[0m [32m INFO[0m Compiled [ 69/362]: build-script-build
+[2m   1.663s[0m [32m INFO[0m Compiled [ 70/362]: crossbeam_utils
+[2m   1.664s[0m [32m INFO[0m Compiled [ 71/362]: lazy_js_bundle
+[2m   1.667s[0m [32m INFO[0m Compiled [ 72/362]: bitflags
+[2m   1.669s[0m [32m INFO[0m Compiled [ 73/362]: fnv
+[2m   1.671s[0m [32m INFO[0m Compiled [ 74/362]: quote
+[2m   1.671s[0m [32m INFO[0m Compiled [ 75/362]: bytemuck
+[2m   1.675s[0m [32m INFO[0m Compiled [ 77/362]: parking_lot
+[2m   1.686s[0m [32m INFO[0m Compiled [ 78/362]: build-script-build
+[2m   1.691s[0m [32m INFO[0m Compiled [ 80/362]: ident_case
+[2m   1.739s[0m [32m INFO[0m Compiled [ 82/362]: build-script-build
+[2m   1.772s[0m [32m INFO[0m Compiled [ 84/362]: build-script-build
+[2m   1.796s[0m [32m INFO[0m Compiled [ 86/362]: crossbeam_epoch
+[2m   1.796s[0m [32m INFO[0m Compiled [ 87/362]: num_integer
+[2m   1.798s[0m [32m INFO[0m Compiled [ 88/362]: unicode_segmentation
+[2m   1.816s[0m [32m INFO[0m Compiled [ 89/362]: either
+[2m   1.819s[0m [32m INFO[0m Compiled [ 90/362]: miniz_oxide
+[2m   1.820s[0m [32m INFO[0m Compiled [ 91/362]: crc32fast
+[2m   1.833s[0m [32m INFO[0m Compiled [ 92/362]: serde_core
+[2m   1.835s[0m [32m INFO[0m Compiled [ 93/362]: quick_error
+[2m   1.858s[0m [32m INFO[0m Compiled [ 94/362]: build-script-build
+[2m   1.892s[0m [32m INFO[0m Compiled [ 95/362]: convert_case
+[2m   1.932s[0m [32m INFO[0m Compiled [ 98/362]: build-script-build
+[2m   1.937s[0m [32m INFO[0m Compiled [ 99/362]: const_format_proc_macros
+[2m   1.971s[0m [32m INFO[0m Compiled [101/362]: zmij
+[2m   1.972s[0m [32m INFO[0m Compiled [102/362]: stable_deref_trait
+[2m   1.976s[0m [32m INFO[0m Compiled [103/362]: libm
+[2m   1.982s[0m [32m INFO[0m Compiled [104/362]: crossbeam_deque
+[2m   2.19s[0m [32m INFO[0m Compiled [105/362]: build-script-build
+[2m   2.36s[0m [32m INFO[0m Compiled [106/362]: syn
+[2m   2.63s[0m [32m INFO[0m Compiled [107/362]: fdeflate
+[2m   2.77s[0m [32m INFO[0m Compiled [108/362]: regex_syntax
+[2m   2.79s[0m [32m INFO[0m Compiled [109/362]: built
+[2m   2.88s[0m [32m INFO[0m Compiled [110/362]: num_bigint
+[2m   2.88s[0m [32m INFO[0m Compiled [111/362]: as_slice
+[2m   2.100s[0m [32m INFO[0m Compiled [112/362]: core_maths
+[2m   2.101s[0m [32m INFO[0m Compiled [113/362]: flate2
+[2m   2.102s[0m [32m INFO[0m Compiled [114/362]: const_format
+[2m   2.112s[0m [32m INFO[0m Compiled [115/362]: lazy_static
+[2m   2.124s[0m [32m INFO[0m Compiled [116/362]: rayon_core
+[2m   2.130s[0m [32m INFO[0m Compiled [117/362]: itoa
+[2m   2.214s[0m [32m INFO[0m Compiled [118/362]: proc_macro2_diagnostics
+[2m   2.229s[0m [32m INFO[0m Compiled [119/362]: warnings_macro
+[2m   2.243s[0m [32m INFO[0m Compiled [120/362]: const_serialize_macro
+[2m   2.292s[0m [32m INFO[0m Compiled [121/362]: const_serialize_macro
+[2m   2.298s[0m [32m INFO[0m Compiled [122/362]: wasm_bindgen_macro_support
+[2m   2.302s[0m [32m INFO[0m Compiled [123/362]: darling_core
+[2m   2.305s[0m [32m INFO[0m Compiled [124/362]: futures_macro
+[2m   2.321s[0m [32m INFO[0m Compiled [125/362]: equator_macro
+[2m   2.370s[0m [32m INFO[0m Compiled [126/362]: const_serialize
+[2m   2.381s[0m [32m INFO[0m Compiled [127/362]: dioxus_rsx
+[2m   2.398s[0m [32m INFO[0m Compiled [128/362]: num_rational
+[2m   2.429s[0m [32m INFO[0m Compiled [129/362]: tracing_attributes
+[2m   2.436s[0m [32m INFO[0m Compiled [130/362]: wasm_bindgen_macro
+[2m   2.436s[0m [32m INFO[0m Compiled [131/362]: darling_macro
+[2m   2.450s[0m [32m INFO[0m Compiled [132/362]: equator
+[2m   2.468s[0m [32m INFO[0m Compiled [133/362]: pin_project_internal
+[2m   2.503s[0m [32m INFO[0m Compiled [134/362]: thiserror_impl
+[2m   2.543s[0m [32m INFO[0m Compiled [135/362]: rayon
+[2m   2.582s[0m [32m INFO[0m Compiled [136/362]: weezl
+[2m   2.598s[0m [32m INFO[0m Compiled [137/362]: darling
+[2m   2.601s[0m [32m INFO[0m Compiled [138/362]: thiserror
+[2m   2.601s[0m [32m INFO[0m Compiled [139/362]: aligned_vec
+[2m   2.601s[0m [32m INFO[0m Compiled [140/362]: pin_project
+[2m   2.610s[0m [32m INFO[0m Compiled [141/362]: tracing
+[2m   2.622s[0m [32m INFO[0m Compiled [142/362]: regex_automata
+[2m   2.647s[0m [32m INFO[0m Compiled [143/362]: build-script-build
+[2m   2.682s[0m [32m INFO[0m Compiled [145/362]: futures_util
+[2m   2.688s[0m [32m INFO[0m Compiled [146/362]: wasm_bindgen
+[2m   2.694s[0m [32m INFO[0m Compiled [147/362]: build-script-build
+[2m   2.746s[0m [32m INFO[0m Compiled [148/362]: float_cmp
+[2m   2.756s[0m [32m INFO[0m Compiled [149/362]: generational_box
+[2m   2.757s[0m [32m INFO[0m Compiled [150/362]: warnings
+[2m   2.757s[0m [32m INFO[0m Compiled [151/362]: const_serialize
+[2m   2.764s[0m [32m INFO[0m Compiled [152/362]: matchers
+[2m   2.768s[0m [32m INFO[0m Compiled [154/362]: dioxus_cli_config
+[2m   2.855s[0m [32m INFO[0m Compiled [155/362]: build-script-build
+[2m   2.858s[0m [32m INFO[0m Compiled [156/362]: serde_json
+[2m   2.864s[0m [32m INFO[0m Compiled [157/362]: v_frame
+[2m   2.864s[0m [32m INFO[0m Compiled [158/362]: aligned
+[2m   2.869s[0m [32m INFO[0m Compiled [159/362]: sharded_slab
+[2m   2.875s[0m [32m INFO[0m Compiled [160/362]: strict_num
+[2m   2.895s[0m [32m INFO[0m Compiled [162/362]: zerocopy_derive
+[2m   2.959s[0m [32m INFO[0m Compiled [163/362]: enumset_derive
+[2m   2.974s[0m [32m INFO[0m Compiled [164/362]: libc
+[2m   2.982s[0m [32m INFO[0m Compiled [165/362]: profiling_procmacros
+[2m   2.994s[0m [32m INFO[0m Compiled [166/362]: ttf_parser
+[2m   3. 6s[0m [32m INFO[0m Compiled [167/362]: dioxus_html_internal_macro
+[2m   3.21s[0m [32m INFO[0m Compiled [168/362]: arg_enum_proc_macro
+[2m   3.55s[0m [32m INFO[0m Compiled [170/362]: build-script-build
+[2m   3.60s[0m [32m INFO[0m Compiled [171/362]: build-script-build
+[2m   3.108s[0m [32m INFO[0m Compiled [172/362]: enumset
+[2m   3.111s[0m [32m INFO[0m Compiled [173/362]: keyboard_types
+[2m   3.120s[0m [32m INFO[0m Compiled [174/362]: dioxus_core_macro
+[2m   3.184s[0m [32m INFO[0m Compiled [175/362]: async_trait
+[2m   3.202s[0m [32m INFO[0m Compiled [176/362]: core2
+[2m   3.215s[0m [32m INFO[0m Compiled [177/362]: thread_local
+[2m   3.217s[0m [32m INFO[0m Compiled [178/362]: euclid
+[2m   3.235s[0m [32m INFO[0m Compiled [179/362]: arrayref
+[2m   3.256s[0m [32m INFO[0m Compiled [180/362]: sledgehammer_bindgen_macro
+[2m   3.256s[0m [32m INFO[0m Compiled [181/362]: serde_derive
+[2m   3.270s[0m [32m INFO[0m Compiled [182/362]: y4m
+[2m   3.340s[0m [32m INFO[0m Compiled [183/362]: nom
+[2m   3.348s[0m [32m INFO[0m Compiled [184/362]: utf8parse
+[2m   3.357s[0m [32m INFO[0m Compiled [185/362]: color_quant
+[2m   3.367s[0m [32m INFO[0m Compiled [186/362]: rustc_hash
+[2m   3.368s[0m [32m INFO[0m Compiled [187/362]: zune_core
+[2m   3.383s[0m [32m INFO[0m Compiled [188/362]: byteorder_lite
+[2m   3.416s[0m [32m INFO[0m Compiled [189/362]: pastey
+[2m   3.437s[0m [32m INFO[0m Compiled [190/362]: serde
+[2m   3.437s[0m [32m INFO[0m Compiled [191/362]: winnow
+[2m   3.447s[0m [32m INFO[0m Compiled [192/362]: serde
+[2m   3.512s[0m [32m INFO[0m Compiled [193/362]: tinyvec_macros
+[2m   3.545s[0m [32m INFO[0m Compiled [194/362]: bytes
+[2m   3.552s[0m [32m INFO[0m Compiled [195/362]: sledgehammer_utils
+[2m   3.559s[0m [32m INFO[0m Compiled [196/362]: anstyle_parse
+[2m   3.560s[0m [32m INFO[0m Compiled [197/362]: zune_jpeg
+[2m   3.562s[0m [32m INFO[0m Compiled [198/362]: zerocopy
+[2m   3.562s[0m [32m INFO[0m Compiled [199/362]: av1_grain
+[2m   3.564s[0m [32m INFO[0m Compiled [200/362]: const_serialize
+[2m   3.566s[0m [32m INFO[0m Compiled [201/362]: av_scenechange
+[2m   3.566s[0m [32m INFO[0m Compiled [202/362]: slotmap
+[2m   3.569s[0m [32m INFO[0m Compiled [203/362]: subsecond_types
+[2m   3.715s[0m [32m INFO[0m Compiled [207/362]: tinyvec
+[2m   3.715s[0m [32m INFO[0m Compiled [208/362]: sledgehammer_bindgen
+[2m   3.717s[0m [32m INFO[0m Compiled [209/362]: profiling
+[2m   3.719s[0m [32m INFO[0m Compiled [210/362]: const_serialize
+[2m   3.719s[0m [32m INFO[0m Compiled [211/362]: tiny_skia_path
+[2m   3.725s[0m [32m INFO[0m Compiled [212/362]: zmij
+[2m   3.725s[0m [32m INFO[0m Compiled [213/362]: bitstream_io
+[2m   3.725s[0m [32m INFO[0m Compiled [214/362]: half
+[2m   3.730s[0m [32m INFO[0m Compiled [215/362]: manganis_core
+[2m   3.732s[0m [32m INFO[0m Compiled [216/362]: tracing_subscriber
+[2m   3.813s[0m [32m INFO[0m Compiled [217/362]: build-script-build
+[2m   3.847s[0m [32m INFO[0m Compiled [219/362]: simd_helpers
+[2m   3.847s[0m [32m INFO[0m Compiled [220/362]: macro_string
+[2m   3.853s[0m [32m INFO[0m Compiled [221/362]: typenum
+[2m   3.860s[0m [32m INFO[0m Compiled [222/362]: paste
+[2m   3.877s[0m [32m INFO[0m Compiled [223/362]: maybe_rayon
+[2m   3.892s[0m [32m INFO[0m Compiled [224/362]: fax_derive
+[2m   3.906s[0m [32m INFO[0m Compiled [225/362]: rgb
+[2m   4. 0s[0m [32m INFO[0m Compiled [226/362]: anstyle_query
+[2m   4. 0s[0m [32m INFO[0m Compiled [227/362]: js_sys
+[2m   4. 0s[0m [32m INFO[0m Compiled [228/362]: debug_unreachable
+[2m   4. 0s[0m [32m INFO[0m Compiled [229/362]: unicode_ccc
+[2m   4. 6s[0m [32m INFO[0m Compiled [230/362]: dunce
+[2m   4. 6s[0m [32m INFO[0m Compiled [231/362]: itertools
+[2m   4.12s[0m [32m INFO[0m Compiled [232/362]: kurbo
+[2m   4.13s[0m [32m INFO[0m Compiled [233/362]: imgref
+[2m   4.13s[0m [32m INFO[0m Compiled [234/362]: memchr
+[2m   4.21s[0m [32m INFO[0m Compiled [235/362]: unicode_script
+[2m   4.40s[0m [32m INFO[0m Compiled [236/362]: num_derive
+[2m   4.132s[0m [32m INFO[0m Compiled [237/362]: noop_proc_macro
+[2m   4.200s[0m [32m INFO[0m Compiled [238/362]: itoa
+[2m   4.203s[0m [32m INFO[0m Compiled [239/362]: unicode_bidi_mirroring
+[2m   4.203s[0m [32m INFO[0m Compiled [240/362]: colorchoice
+[2m   4.210s[0m [32m INFO[0m Compiled [241/362]: siphasher
+[2m   4.211s[0m [32m INFO[0m Compiled [242/362]: bitflags
+[2m   4.221s[0m [32m INFO[0m Compiled [243/362]: unicode_properties
+[2m   4.223s[0m [32m INFO[0m Compiled [244/362]: anstyle
+[2m   4.223s[0m [32m INFO[0m Compiled [245/362]: is_terminal_polyfill
+[2m   4.226s[0m [32m INFO[0m Compiled [246/362]: wasm_bindgen_futures
+[2m   4.307s[0m [32m INFO[0m Compiled [247/362]: memmap2
+[2m   4.310s[0m [32m INFO[0m Compiled [248/362]: loop9
+[2m   4.310s[0m [32m INFO[0m Compiled [249/362]: winnow
+[2m   4.388s[0m [32m INFO[0m Compiled [250/362]: serde_wasm_bindgen
+[2m   4.395s[0m [32m INFO[0m Compiled [251/362]: png
+[2m   4.404s[0m [32m INFO[0m Compiled [252/362]: serde_json
+[2m   4.410s[0m [32m INFO[0m Compiled [254/362]: manganis_macro
+[2m   4.413s[0m [32m INFO[0m Compiled [255/362]: anstream
+[2m   4.416s[0m [32m INFO[0m Compiled [256/362]: gloo_timers
+[2m   4.417s[0m [32m INFO[0m Compiled [257/362]: svgtypes
+[2m   4.428s[0m [32m INFO[0m Compiled [258/362]: rustybuzz
+[2m   4.468s[0m [32m INFO[0m Compiled [259/362]: manganis_core
+[2m   4.524s[0m [32m INFO[0m Compiled [260/362]: fax
+[2m   4.525s[0m [32m INFO[0m Compiled [261/362]: avif_serialize
+[2m   4.533s[0m [32m INFO[0m Compiled [262/362]: fontdb
+[2m   4.535s[0m [32m INFO[0m Compiled [263/362]: simplecss
+[2m   4.535s[0m [32m INFO[0m Compiled [264/362]: bitmaps
+[2m   4.537s[0m [32m INFO[0m Compiled [265/362]: zune_inflate
+[2m   4.602s[0m [32m INFO[0m Compiled [266/362]: tracing_wasm
+[2m   4.647s[0m [32m INFO[0m Compiled [267/362]: send_wrapper
+[2m   4.654s[0m [32m INFO[0m Compiled [268/362]: dioxus_stores_macro
+[2m   4.663s[0m [32m INFO[0m Compiled [269/362]: pico_args
+[2m   4.666s[0m [32m INFO[0m Compiled [270/362]: roxmltree
+[2m   4.666s[0m [32m INFO[0m Compiled [271/362]: strsim
+[2m   4.674s[0m [32m INFO[0m Compiled [272/362]: foldhash
+[2m   4.683s[0m [32m INFO[0m Compiled [273/362]: build-script-build
+[2m   4.690s[0m [32m INFO[0m Compiled [274/362]: rav1e
+[2m   4.714s[0m [32m INFO[0m Compiled [275/362]: build-script-build
+[2m   4.766s[0m [32m INFO[0m Compiled [276/362]: base64
+[2m   4.804s[0m [32m INFO[0m Compiled [277/362]: xmlwriter
+[2m   4.824s[0m [32m INFO[0m Compiled [278/362]: clap_lex
+[2m   4.836s[0m [32m INFO[0m Compiled [279/362]: unicode_bidi
+[2m   4.843s[0m [32m INFO[0m Compiled [280/362]: heck
+[2m   4.845s[0m [32m INFO[0m Compiled [281/362]: triomphe
+[2m   4.846s[0m [32m INFO[0m Compiled [282/362]: imagesize
+[2m   4.870s[0m [32m INFO[0m Compiled [283/362]: hashbrown
+[2m   4.873s[0m [32m INFO[0m Compiled [284/362]: bit_field
+[2m   4.873s[0m [32m INFO[0m Compiled [285/362]: option_ext
+[2m   4.926s[0m [32m INFO[0m Compiled [286/362]: zune_core
+[2m   4.933s[0m [32m INFO[0m Compiled [287/362]: equivalent
+[2m   4.933s[0m [32m INFO[0m Compiled [288/362]: unicode_vo
+[2m   4.954s[0m [32m INFO[0m Compiled [290/362]: pxfm
+[2m   5. 6s[0m [32m INFO[0m Compiled [291/362]: dirs_sys
+[2m   5. 9s[0m [32m INFO[0m Compiled [292/362]: lebe
+[2m   5.11s[0m [32m INFO[0m Compiled [293/362]: rand_core
+[2m   5.15s[0m [32m INFO[0m Compiled [294/362]: archery
+[2m   5.90s[0m [32m INFO[0m Compiled [296/362]: zune_jpeg
+[2m   5.95s[0m [32m INFO[0m Compiled [297/362]: data_url
+[2m   5.97s[0m [32m INFO[0m Compiled [298/362]: indexmap
+[2m   5.97s[0m [32m INFO[0m Compiled [299/362]: clap_builder
+[2m   5.100s[0m [32m INFO[0m Compiled [300/362]: ravif
+[2m   5.162s[0m [32m INFO[0m Compiled [301/362]: rand_xoshiro
+[2m   5.172s[0m [32m INFO[0m Compiled [302/362]: dioxus_logger
+[2m   5.187s[0m [32m INFO[0m Compiled [303/362]: hashbrown
+[2m   5.216s[0m [32m INFO[0m Compiled [304/362]: manganis
+[2m   5.240s[0m [32m INFO[0m Compiled [305/362]: sized_chunks
+[2m   5.251s[0m [32m INFO[0m Compiled [306/362]: moxcms
+[2m   5.268s[0m [32m INFO[0m Compiled [307/362]: build-script-build
+[2m   5.321s[0m [32m INFO[0m Compiled [308/362]: usvg
+[2m   5.346s[0m [32m INFO[0m Compiled [309/362]: tiff
+[2m   5.350s[0m [32m INFO[0m Compiled [310/362]: gif
+[2m   5.353s[0m [32m INFO[0m Compiled [311/362]: image_webp
+[2m   5.355s[0m [32m INFO[0m Compiled [312/362]: tiny_skia
+[2m   5.364s[0m [32m INFO[0m Compiled [313/362]: gif
+[2m   5.366s[0m [32m INFO[0m Compiled [314/362]: exr
+[2m   5.367s[0m [32m INFO[0m Compiled [315/362]: image_webp
+[2m   5.373s[0m [32m INFO[0m Compiled [316/362]: dioxus_config_macro
+[2m   5.380s[0m [32m INFO[0m Compiled [317/362]: clap_derive
+[2m   5.458s[0m [32m INFO[0m Compiled [318/362]: include_dir_macros
+[2m   5.497s[0m [32m INFO[0m Compiled [319/362]: png
+[2m   5.515s[0m [32m INFO[0m Compiled [321/362]: dioxus_config_macros
+[2m   5.517s[0m [32m INFO[0m Compiled [322/362]: clap
+[2m   5.523s[0m [32m INFO[0m Compiled [323/362]: glob
+[2m   5.526s[0m [32m INFO[0m Compiled [324/362]: tower_service
+[2m   5.526s[0m [32m INFO[0m Compiled [325/362]: tower_layer
+[2m   5.526s[0m [32m INFO[0m Compiled [326/362]: fastrand
+[2m   5.526s[0m [32m INFO[0m Compiled [327/362]: qoi
+[2m   5.526s[0m [32m INFO[0m Compiled [328/362]: fixedbitset
+[2m   5.682s[0m [32m INFO[0m Compiled [329/362]: tempfile
+[2m   5.685s[0m [32m INFO[0m Compiled [330/362]: sync_wrapper
+[2m   5.685s[0m [32m INFO[0m Compiled [331/362]: dirs
+[2m   5.686s[0m [32m INFO[0m Compiled [332/362]: include_dir
+[2m   5.690s[0m [32m INFO[0m Compiled [333/362]: resvg
+[2m   5.690s[0m [32m INFO[0m Compiled [334/362]: getrandom
+[2m   5.694s[0m [32m INFO[0m Compiled [335/362]: getrandom
+[2m   5.696s[0m [32m INFO[0m Compiled [336/362]: im
+[2m   5.701s[0m [32m INFO[0m Compiled [337/362]: rpds
+[2m   5.771s[0m [32m INFO[0m Compiled [338/362]: petgraph
+[2m   5.788s[0m [32m INFO[0m Compiled [339/362]: num_cpus
+[2m   5.805s[0m [32m INFO[0m Compiled [340/362]: tap
+[2m   5.808s[0m [32m INFO[0m Compiled [341/362]: regex_lite
+[2m   5.814s[0m [32m INFO[0m Compiled [342/362]: uuid
+[2m   5.817s[0m [32m INFO[0m Compiled [343/362]: image
+[2m   5.830s[0m [32m INFO[0m Compiled [344/362]: web_sys
+[2m   5.882s[0m [32m INFO[0m Compiled [345/362]: tower
+[2m   5.918s[0m [32m INFO[0m Compiled [346/362]: dioxus_asset_resolver
+[2m   5.928s[0m [32m INFO[0m Compiled [347/362]: subsecond
+[2m   5.932s[0m [32m INFO[0m Compiled [348/362]: dioxus_interpreter_js
+[2m   6.80s[0m [32m INFO[0m Compiled [349/362]: dioxus_core
+[2m   6.150s[0m [32m INFO[0m Compiled [350/362]: dioxus_devtools_types
+[2m   6.162s[0m [32m INFO[0m Compiled [351/362]: dioxus_history
+[2m   6.177s[0m [32m INFO[0m Compiled [352/362]: dioxus_signals
+[2m   6.211s[0m [32m INFO[0m Compiled [353/362]: wasm_streams
+[2m   6.263s[0m [32m INFO[0m Compiled [354/362]: dioxus_hooks
+[2m   6.267s[0m [32m INFO[0m Compiled [355/362]: dioxus_devtools
+[2m   6.273s[0m [32m INFO[0m Compiled [356/362]: dioxus_stores
+[2m   6.550s[0m [32m INFO[0m Compiled [357/362]: dioxus_html
+[2m   6.647s[0m [32m INFO[0m Compiled [358/362]: dioxus_document
+[2m   6.748s[0m [32m INFO[0m Compiled [359/362]: dioxus_web
+[2m   6.825s[0m [32m INFO[0m Compiled [360/362]: dioxus
+[2m   7.334s[0m [32m INFO[0m  [1m[33mwarning[0m[1m: ignoring -C extra-filename flag due to -o flag[0m
+
+
+[2m   7.335s[0m [32m INFO[0m  [1m[91merror[E0432][0m[1m: unresolved import `crate::store_async`[0m
+  [1m[94m--> [0mdiagram_tool/src/models/sync.rs:61:12
+   [1m[94m|[0m
+[1m[94m61[0m [1m[94m|[0m use crate::store_async::envelope_to_valid_event;
+   [1m[94m|[0m            [1m[91m^^^^^^^^^^^[0m [1m[91mcould not find `store_async` in the crate root[0m
+   [1m[94m|[0m
+[1m[92mnote[0m: found an item that was configured out
+  [1m[94m--> [0mdiagram_tool/src/lib.rs:81:9
+   [1m[94m|[0m
+[1m[94m80[0m [1m[94m|[0m #[cfg(not(target_arch = "wasm32"))]
+   [1m[94m|[0m          [1m[94m------------------------[0m [1m[94mthe item is gated here[0m
+[1m[94m81[0m [1m[94m|[0m pub mod store_async;
+   [1m[94m|[0m         [1m[92m^^^^^^^^^^^[0m
+
+
+[2m   7.335s[0m [32m INFO[0m  [1mFor more information about this error, try `rustc --explain E0432`.[0m
+
+▪▪▪▪ root:build-web (7s 352ms, e1f911da)
+
+Running 12 tests using 4 workers
+
+  ✘   1 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:75:7 › redqueen first-20 deterministic intents › baseline scene loads with finite counters @baseline (46.0s)
+  ✘   2 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:88:7 › redqueen first-20 deterministic intents › baseline selection picks two nodes deterministically @baseline (46.1s)
+  ✘   4 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:107:7 › redqueen first-20 deterministic intents › baseline drag applies stable positive delta @baseline (46.1s)
+  ✘   3 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:124:7 › redqueen first-20 deterministic intents › baseline undo redo around drag restores then reapplies @baseline (46.1s)
+  ✘   6 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:88:7 › redqueen first-20 deterministic intents › baseline selection picks two nodes deterministically @baseline (retry #1) (46.0s)
+  ✘   5 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:75:7 › redqueen first-20 deterministic intents › baseline scene loads with finite counters @baseline (retry #1) (46.0s)
+  ✘   7 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:107:7 › redqueen first-20 deterministic intents › baseline drag applies stable positive delta @baseline (retry #1) (46.0s)
+  ✘   8 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:124:7 › redqueen first-20 deterministic intents › baseline undo redo around drag restores then reapplies @baseline (retry #1) (46.0s)
+  ✘   9 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:150:7 › redqueen first-20 deterministic intents › baseline copy paste duplicates selected nodes @baseline (46.0s)
+  ✘  10 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:172:7 › redqueen first-20 deterministic intents › baseline delete operation keeps scene valid @baseline (46.0s)
+  ✘  11 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:190:7 › redqueen first-20 deterministic intents › baseline nested resize keeps inner outer ratios bounded @baseline (46.0s)
+  ✘  12 [baseline] › diagram_tool/e2e/specs-redqueen/rq-first20.deterministic.spec.ts:211:7 › redqueen first-20 deterministic intents › baseline nested minimum clamp prevents negative dimensions @baseline (46.1s)
+▪▪▪▪ root:e2e-baseline (3m 18s 370ms)
+
+Tasks: 1 skipped
+ Time: 3m 18s 371ms (interrupted)

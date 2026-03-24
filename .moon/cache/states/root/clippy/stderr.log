@@ -1,0 +1,449 @@
+[1m[92m   Compiling[0m diagram_tool v0.1.0 (/home/lewis/src/seshat/diagram_tool)
+[1m[92m    Checking[0m nu_runner v0.1.0 (/home/lewis/src/seshat/nu_runner)
+[1m[33mwarning[0m[1m: `(f64, f64)` does not refer to a reachable type[0m
+ [1m[94m--> [0m/home/lewis/src/seshat/diagram_tool/clippy.toml:1:1
+  [1m[94m|[0m
+[1m[94m1[0m [1m[94m|[0m [1m[33m/[0m [[disallowed-types]]
+[1m[94m2[0m [1m[94m|[0m [1m[33m|[0m path = "(f64, f64)"
+[1m[94m3[0m [1m[94m|[0m [1m[33m|[0m reason = "Use strongly typed Point or Vector instead of a raw f64 tuple."
+  [1m[94m|[0m [1m[33m|_________________________________________________________________________^[0m
+  [1m[94m|[0m
+  [1m[94m= [0m[1mhelp[0m: add `allow-invalid = true` to the entry to suppress this warning
+
+[1m[91merror[0m[1m: item in documentation is missing backticks[0m
+  [1m[94m--> [0mnu_runner/src/newtypes.rs:52:28
+   [1m[94m|[0m
+[1m[94m52[0m [1m[94m|[0m /// Error type for invalid NuPath construction.
+   [1m[94m|[0m                            [1m[91m^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#doc_markdown
+   [1m[94m= [0m[1mnote[0m: `-D clippy::doc-markdown` implied by `-D warnings`
+   [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+[1m[96mhelp[0m: try
+   [1m[94m|[0m
+[1m[94m52[0m [91m- [0m/// Error type for invalid [91mNuPath[0m construction.
+[1m[94m52[0m [92m+ [0m/// Error type for invalid [92m`NuPath`[0m construction.
+   [1m[94m|[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+  [1m[94m--> [0mnu_runner/src/newtypes.rs:79:5
+   [1m[94m|[0m
+[1m[94m79[0m [1m[94m|[0m [1m[91m/[0m     pub fn new(ms: u64) -> Result<Self, TimeoutMsError> {
+[1m[94m80[0m [1m[94m|[0m [1m[91m|[0m         if ms == 0 {
+[1m[94m81[0m [1m[94m|[0m [1m[91m|[0m             Err(TimeoutMsError::ZeroTimeout)
+[1m[94m82[0m [1m[94m|[0m [1m[91m|[0m         } else {
+[1m[94m...[0m  [1m[91m|[0m
+[1m[94m85[0m [1m[94m|[0m [1m[91m|[0m     }
+   [1m[94m|[0m [1m[91m|_____^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+   [1m[94m= [0m[1mnote[0m: `-D clippy::missing-const-for-fn` implied by `-D warnings`
+   [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::missing_const_for_fn)]`
+[1m[96mhelp[0m: make the function `const`
+   [1m[94m|[0m
+[1m[94m79[0m [1m[94m| [0m    pub[92m const[0m fn new(ms: u64) -> Result<Self, TimeoutMsError> {
+   [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: unnecessary structure name repetition[0m
+   [1m[94m--> [0mnu_runner/src/newtypes.rs:109:9
+    [1m[94m|[0m
+[1m[94m109[0m [1m[94m|[0m         std::time::Duration::from_millis(val.0)
+    [1m[94m|[0m         [1m[91m^^^^^^^^^^^^^^^^^^^[0m [1m[91mhelp: use the applicable keyword: `Self`[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#use_self
+    [1m[94m= [0m[1mnote[0m: `-D clippy::use-self` implied by `-D warnings`
+    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::use_self)]`
+
+[1m[91merror[0m[1m: item in documentation is missing backticks[0m
+   [1m[94m--> [0mnu_runner/src/newtypes.rs:113:28
+    [1m[94m|[0m
+[1m[94m113[0m [1m[94m|[0m /// Error type for invalid TimeoutMs construction.
+    [1m[94m|[0m                            [1m[91m^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#doc_markdown
+[1m[96mhelp[0m: try
+    [1m[94m|[0m
+[1m[94m113[0m [91m- [0m/// Error type for invalid [91mTimeoutMs[0m construction.
+[1m[94m113[0m [92m+ [0m/// Error type for invalid [92m`TimeoutMs`[0m construction.
+    [1m[94m|[0m
+
+[1m[91merror[0m[1m: this method could have a `#[must_use]` attribute[0m
+   [1m[94m--> [0mnu_runner/src/newtypes.rs:141:18
+    [1m[94m|[0m
+[1m[94m141[0m [1m[94m|[0m     pub const fn new(code: i32) -> Self {
+    [1m[94m|[0m                  [1m[91m^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#must_use_candidate
+    [1m[94m= [0m[1mnote[0m: `-D clippy::must-use-candidate` implied by `-D warnings`
+    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::must_use_candidate)]`
+[1m[96mhelp[0m: add the attribute
+    [1m[94m|[0m
+[1m[94m141[0m [92m~ [0m    [92m#[must_use] [0m
+[1m[94m142[0m [92m~     [0mpub const fn new(code: i32) -> Self {
+    [1m[94m|[0m
+
+[1m[91merror[0m[1m: this `impl` can be derived[0m
+   [1m[94m--> [0mnu_runner/src/newtypes.rs:158:1
+    [1m[94m|[0m
+[1m[94m158[0m [1m[94m|[0m [1m[91m/[0m impl Default for ExitCode {
+[1m[94m159[0m [1m[94m|[0m [1m[91m|[0m     fn default() -> Self {
+[1m[94m160[0m [1m[94m|[0m [1m[91m|[0m         Self(0)
+[1m[94m161[0m [1m[94m|[0m [1m[91m|[0m     }
+[1m[94m162[0m [1m[94m|[0m [1m[91m|[0m }
+    [1m[94m|[0m [1m[91m|_^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#derivable_impls
+    [1m[94m= [0m[1mnote[0m: `-D clippy::derivable-impls` implied by `-D warnings`
+    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::derivable_impls)]`
+[1m[96mhelp[0m: replace the manual implementation with a derive attribute
+    [1m[94m|[0m
+[1m[94m133[0m [92m+ #[derive(Default)][0m
+[1m[94m134[0m [1m[94m|[0m pub struct ExitCode(pub i32);
+    [1m[94m|[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+   [1m[94m--> [0mnu_runner/src/newtypes.rs:190:5
+    [1m[94m|[0m
+[1m[94m190[0m [1m[94m|[0m [1m[91m/[0m     pub fn as_map(&self) -> &HashMap<String, String> {
+[1m[94m191[0m [1m[94m|[0m [1m[91m|[0m         &self.0
+[1m[94m192[0m [1m[94m|[0m [1m[91m|[0m     }
+    [1m[94m|[0m [1m[91m|_____^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+    [1m[94m|[0m
+[1m[94m190[0m [1m[94m| [0m    pub[92m const[0m fn as_map(&self) -> &HashMap<String, String> {
+    [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: this function has a `#[must_use]` attribute with no message, but returns a type already marked as `#[must_use]`[0m
+   [1m[94m--> [0mnu_runner/src/newtypes.rs:196:5
+    [1m[94m|[0m
+[1m[94m196[0m [1m[94m|[0m     pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
+    [1m[94m|[0m     [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: either add some descriptive message or remove the attribute
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#double_must_use
+    [1m[94m= [0m[1mnote[0m: `-D clippy::double-must-use` implied by `-D warnings`
+    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::double_must_use)]`
+
+[1m[91merror[0m[1m: it is more concise to loop over references to containers instead of using explicit iteration methods[0m
+  [1m[94m--> [0mnu_runner/src/runner.rs:29:25
+   [1m[94m|[0m
+[1m[94m29[0m [1m[94m|[0m     for (key, value) in config.env.0.iter() {
+   [1m[94m|[0m                         [1m[91m^^^^^^^^^^^^^^^^^^^[0m [1m[91mhelp: to write this more concisely, try: `&config.env.0`[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#explicit_iter_loop
+   [1m[94m= [0m[1mnote[0m: `-D clippy::explicit-iter-loop` implied by `-D warnings`
+   [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::explicit_iter_loop)]`
+
+[1m[91merror[0m[1m: match can be simplified with `.unwrap_or_default()`[0m
+   [1m[94m--> [0mnu_runner/src/runner.rs:100:38
+    [1m[94m|[0m
+[1m[94m100[0m [1m[94m|[0m               self.config.timeout_ms = match TimeoutMs::new(ms) {
+    [1m[94m|[0m [1m[91m ______________________________________^[0m
+[1m[94m101[0m [1m[94m|[0m [1m[91m|[0m                 Ok(t) => t,
+[1m[94m...[0m   [1m[91m|[0m
+[1m[94m105[0m [1m[94m|[0m [1m[91m|[0m             };
+    [1m[94m|[0m [1m[91m|_____________^[0m [1m[91mhelp: replace it with: `TimeoutMs::new(ms).unwrap_or_default()`[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#manual_unwrap_or_default
+    [1m[94m= [0m[1mnote[0m: `-D clippy::manual-unwrap-or-default` implied by `-D warnings`
+    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::manual_unwrap_or_default)]`
+
+[1m[91merror[0m[1m: use Option::map_or_else instead of an if let/else[0m
+   [1m[94m--> [0mnu_runner/src/runner.rs:100:38
+    [1m[94m|[0m
+[1m[94m100[0m [1m[94m|[0m               self.config.timeout_ms = match TimeoutMs::new(ms) {
+    [1m[94m|[0m [1m[91m ______________________________________^[0m
+[1m[94m101[0m [1m[94m|[0m [1m[91m|[0m                 Ok(t) => t,
+[1m[94m...[0m   [1m[91m|[0m
+[1m[94m105[0m [1m[94m|[0m [1m[91m|[0m             };
+    [1m[94m|[0m [1m[91m|_____________^[0m [1m[91mhelp: try: `TimeoutMs::new(ms).map_or_else(|_| TimeoutMs::default(), |t| t)`[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#option_if_let_else
+    [1m[94m= [0m[1mnote[0m: `-D clippy::option-if-let-else` implied by `-D warnings`
+    [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::option_if_let_else)]`
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+   [1m[94m--> [0mnu_runner/src/runner.rs:191:5
+    [1m[94m|[0m
+[1m[94m191[0m [1m[94m|[0m [1m[91m/[0m     pub fn env(&self) -> &std::collections::HashMap<String, String> {
+[1m[94m192[0m [1m[94m|[0m [1m[91m|[0m         &self.config.env.0
+[1m[94m193[0m [1m[94m|[0m [1m[91m|[0m     }
+    [1m[94m|[0m [1m[91m|_____^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+    [1m[94m|[0m
+[1m[94m191[0m [1m[94m| [0m    pub[92m const[0m fn env(&self) -> &std::collections::HashMap<String, String> {
+    [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+   [1m[94m--> [0mnu_runner/src/runner.rs:197:5
+    [1m[94m|[0m
+[1m[94m197[0m [1m[94m|[0m [1m[91m/[0m     pub fn cwd(&self) -> Option<&std::path::PathBuf> {
+[1m[94m198[0m [1m[94m|[0m [1m[91m|[0m         self.config.cwd.as_ref()
+[1m[94m199[0m [1m[94m|[0m [1m[91m|[0m     }
+    [1m[94m|[0m [1m[91m|_____^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+    [1m[94m|[0m
+[1m[94m197[0m [1m[94m| [0m    pub[92m const[0m fn cwd(&self) -> Option<&std::path::PathBuf> {
+    [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+   [1m[94m--> [0mnu_runner/src/runner.rs:203:5
+    [1m[94m|[0m
+[1m[94m203[0m [1m[94m|[0m [1m[91m/[0m     pub fn timeout(&self) -> Duration {
+[1m[94m204[0m [1m[94m|[0m [1m[91m|[0m         Duration::from_millis(self.config.timeout_ms.0)
+[1m[94m205[0m [1m[94m|[0m [1m[91m|[0m     }
+    [1m[94m|[0m [1m[91m|_____^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+    [1m[94m|[0m
+[1m[94m203[0m [1m[94m| [0m    pub[92m const[0m fn timeout(&self) -> Duration {
+    [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: this `impl` can be derived[0m
+  [1m[94m--> [0mnu_runner/src/state.rs:18:1
+   [1m[94m|[0m
+[1m[94m18[0m [1m[94m|[0m [1m[91m/[0m impl Default for RunnerState {
+[1m[94m19[0m [1m[94m|[0m [1m[91m|[0m     fn default() -> Self {
+[1m[94m20[0m [1m[94m|[0m [1m[91m|[0m         Self::Ready
+[1m[94m21[0m [1m[94m|[0m [1m[91m|[0m     }
+[1m[94m22[0m [1m[94m|[0m [1m[91m|[0m }
+   [1m[94m|[0m [1m[91m|_^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#derivable_impls
+[1m[96mhelp[0m: replace the manual implementation with a derive attribute and mark the default variant
+   [1m[94m|[0m
+[1m[94m11[0m [92m+ #[derive(Default)][0m
+[1m[94m12[0m [1m[94m|[0m pub enum RunnerState {
+[1m[94m13[0m [1m[94m|[0m     /// Ready to execute a command
+[1m[94m14[0m [92m~ [0m    [92m#[default][0m
+[1m[94m15[0m [92m~     [0mReady,
+   [1m[94m|[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+  [1m[94m--> [0mnu_runner/src/state.rs:41:5
+   [1m[94m|[0m
+[1m[94m41[0m [1m[94m|[0m [1m[91m/[0m     pub fn start_executing(self) -> Result<Self, RunnerStateError> {
+[1m[94m42[0m [1m[94m|[0m [1m[91m|[0m         match self {
+[1m[94m43[0m [1m[94m|[0m [1m[91m|[0m             Self::Ready => Ok(Self::Executing),
+[1m[94m44[0m [1m[94m|[0m [1m[91m|[0m             Self::Executing => Err(RunnerStateError::AlreadyExecuting),
+[1m[94m45[0m [1m[94m|[0m [1m[91m|[0m         }
+[1m[94m46[0m [1m[94m|[0m [1m[91m|[0m     }
+   [1m[94m|[0m [1m[91m|_____^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+   [1m[94m|[0m
+[1m[94m41[0m [1m[94m| [0m    pub[92m const[0m fn start_executing(self) -> Result<Self, RunnerStateError> {
+   [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: this method could have a `#[must_use]` attribute[0m
+  [1m[94m--> [0mnu_runner/src/state.rs:49:12
+   [1m[94m|[0m
+[1m[94m49[0m [1m[94m|[0m     pub fn finish_executing(self) -> Self {
+   [1m[94m|[0m            [1m[91m^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#must_use_candidate
+[1m[96mhelp[0m: add the attribute
+   [1m[94m|[0m
+[1m[94m49[0m [92m~ [0m    [92m#[must_use] [0m
+[1m[94m50[0m [92m~     [0mpub fn finish_executing(self) -> Self {
+   [1m[94m|[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+  [1m[94m--> [0mnu_runner/src/state.rs:49:5
+   [1m[94m|[0m
+[1m[94m49[0m [1m[94m|[0m [1m[91m/[0m     pub fn finish_executing(self) -> Self {
+[1m[94m50[0m [1m[94m|[0m [1m[91m|[0m         Self::Ready
+[1m[94m51[0m [1m[94m|[0m [1m[91m|[0m     }
+   [1m[94m|[0m [1m[91m|_____^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+   [1m[94m|[0m
+[1m[94m49[0m [1m[94m| [0m    pub[92m const[0m fn finish_executing(self) -> Self {
+   [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: missing `#[must_use]` attribute on a method returning `Self`[0m
+  [1m[94m--> [0mnu_runner/src/state.rs:49:5
+   [1m[94m|[0m
+[1m[94m49[0m [1m[94m|[0m [1m[91m/[0m     pub fn finish_executing(self) -> Self {
+[1m[94m50[0m [1m[94m|[0m [1m[91m|[0m         Self::Ready
+[1m[94m51[0m [1m[94m|[0m [1m[91m|[0m     }
+   [1m[94m|[0m [1m[91m|_____^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#return_self_not_must_use
+   [1m[94m= [0m[1mnote[0m: `-D clippy::return-self-not-must-use` implied by `-D warnings`
+   [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::return_self_not_must_use)]`
+
+[1m[91merror[0m[1m: item in documentation is missing backticks[0m
+ [1m[94m--> [0mnu_runner/src/types.rs:3:49
+  [1m[94m|[0m
+[1m[94m3[0m [1m[94m|[0m //! This module contains the main domain types: NuOutput, NuConfig, and NuRunner.
+  [1m[94m|[0m                                                 [1m[91m^^^^^^^^[0m
+  [1m[94m|[0m
+  [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#doc_markdown
+[1m[96mhelp[0m: try
+  [1m[94m|[0m
+[1m[94m3[0m [91m- [0m//! This module contains the main domain types: [91mNuOutput[0m, NuConfig, and NuRunner.
+[1m[94m3[0m [92m+ [0m//! This module contains the main domain types: [92m`NuOutput`[0m, NuConfig, and NuRunner.
+  [1m[94m|[0m
+
+[1m[91merror[0m[1m: item in documentation is missing backticks[0m
+ [1m[94m--> [0mnu_runner/src/types.rs:3:59
+  [1m[94m|[0m
+[1m[94m3[0m [1m[94m|[0m //! This module contains the main domain types: NuOutput, NuConfig, and NuRunner.
+  [1m[94m|[0m                                                           [1m[91m^^^^^^^^[0m
+  [1m[94m|[0m
+  [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#doc_markdown
+[1m[96mhelp[0m: try
+  [1m[94m|[0m
+[1m[94m3[0m [91m- [0m//! This module contains the main domain types: NuOutput, [91mNuConfig[0m, and NuRunner.
+[1m[94m3[0m [92m+ [0m//! This module contains the main domain types: NuOutput, [92m`NuConfig`[0m, and NuRunner.
+  [1m[94m|[0m
+
+[1m[91merror[0m[1m: item in documentation is missing backticks[0m
+ [1m[94m--> [0mnu_runner/src/types.rs:3:73
+  [1m[94m|[0m
+[1m[94m3[0m [1m[94m|[0m //! This module contains the main domain types: NuOutput, NuConfig, and NuRunner.
+  [1m[94m|[0m                                                                         [1m[91m^^^^^^^^[0m
+  [1m[94m|[0m
+  [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#doc_markdown
+[1m[96mhelp[0m: try
+  [1m[94m|[0m
+[1m[94m3[0m [91m- [0m//! This module contains the main domain types: NuOutput, NuConfig, and [91mNuRunner[0m.
+[1m[94m3[0m [92m+ [0m//! This module contains the main domain types: NuOutput, NuConfig, and [92m`NuRunner`[0m.
+  [1m[94m|[0m
+
+[1m[91merror[0m[1m: this could be a `const fn`[0m
+  [1m[94m--> [0mnu_runner/src/types.rs:82:5
+   [1m[94m|[0m
+[1m[94m82[0m [1m[94m|[0m [1m[91m/[0m     pub fn timeout(&self) -> std::time::Duration {
+[1m[94m83[0m [1m[94m|[0m [1m[91m|[0m         std::time::Duration::from_millis(self.timeout_ms.0)
+[1m[94m84[0m [1m[94m|[0m [1m[91m|[0m     }
+   [1m[94m|[0m [1m[91m|_____^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_const_for_fn
+[1m[96mhelp[0m: make the function `const`
+   [1m[94m|[0m
+[1m[94m82[0m [1m[94m| [0m    pub[92m const[0m fn timeout(&self) -> std::time::Duration {
+   [1m[94m|[0m         [92m+++++[0m
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:25:1
+   [1m[94m|[0m
+[1m[94m25[0m [1m[94m|[0m pub fn validate_command(command: &str) -> Result<Command, NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+   [1m[94m= [0m[1mnote[0m: `-D clippy::missing-errors-doc` implied by `-D warnings`
+   [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::missing_errors_doc)]`
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:32:1
+   [1m[94m|[0m
+[1m[94m32[0m [1m[94m|[0m pub fn parse_command(command: &str) -> Result<Command, NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:48:1
+   [1m[94m|[0m
+[1m[94m48[0m [1m[94m|[0m pub fn validate_working_directory(cwd: Option<&PathBuf>) -> Result<(), NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: item in documentation is missing backticks[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:55:17
+   [1m[94m|[0m
+[1m[94m55[0m [1m[94m|[0m /// Validates a PathBuf as a working directory.
+   [1m[94m|[0m                 [1m[91m^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#doc_markdown
+[1m[96mhelp[0m: try
+   [1m[94m|[0m
+[1m[94m55[0m [91m- [0m/// Validates a [91mPathBuf[0m as a working directory.
+[1m[94m55[0m [92m+ [0m/// Validates a [92m`PathBuf`[0m as a working directory.
+   [1m[94m|[0m
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:58:1
+   [1m[94m|[0m
+[1m[94m58[0m [1m[94m|[0m pub fn parse_working_directory(cwd: Option<PathBuf>) -> Result<Option<PathBuf>, NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:74:1
+   [1m[94m|[0m
+[1m[94m74[0m [1m[94m|[0m pub fn validate_timeout(timeout_ms: u64) -> Result<TimeoutMs, NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:85:1
+   [1m[94m|[0m
+[1m[94m85[0m [1m[94m|[0m pub fn parse_timeout(timeout_ms: u64) -> Result<TimeoutMs, NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+  [1m[94m--> [0mnu_runner/src/validation.rs:99:1
+   [1m[94m|[0m
+[1m[94m99[0m [1m[94m|[0m pub const fn validate_env_vars(_env: &EnvVars) -> Result<(), NuError> {
+   [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+   [1m[94m--> [0mnu_runner/src/validation.rs:113:1
+    [1m[94m|[0m
+[1m[94m113[0m [1m[94m|[0m pub fn validate_nu_path(path: &str) -> Result<NuPath, NuError> {
+    [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+   [1m[94m--> [0mnu_runner/src/validation.rs:122:1
+    [1m[94m|[0m
+[1m[94m122[0m [1m[94m|[0m pub fn parse_nu_path(path: &str) -> Result<NuPath, NuError> {
+    [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: docs for function returning `Result` missing `# Errors` section[0m
+   [1m[94m--> [0mnu_runner/src/validation.rs:143:1
+    [1m[94m|[0m
+[1m[94m143[0m [1m[94m|[0m pub fn validate_config(config: &NuConfig, command: &str) -> Result<Command, NuError> {
+    [1m[94m|[0m [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#missing_errors_doc
+
+[1m[91merror[0m[1m: this function could have a `#[must_use]` attribute[0m
+   [1m[94m--> [0mnu_runner/src/validation.rs:168:8
+    [1m[94m|[0m
+[1m[94m168[0m [1m[94m|[0m pub fn parse_output(output: &std::process::Output) -> crate::types::NuOutput {
+    [1m[94m|[0m        [1m[91m^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#must_use_candidate
+[1m[96mhelp[0m: add the attribute
+    [1m[94m|[0m
+[1m[94m168[0m [92m+ #[must_use] [0m
+[1m[94m169[0m [1m[94m| [0mpub fn parse_output(output: &std::process::Output) -> crate::types::NuOutput {
+    [1m[94m|[0m
+
+[1m[91merror[0m: could not compile `nu_runner` (lib) due to 35 previous errors
+[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
+[1m[33mwarning[0m: `diagram_tool` (build script) generated 1 warning

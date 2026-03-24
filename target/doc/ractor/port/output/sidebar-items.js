@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["OutputPort"],"trait":["OutputMessage","OutputPortSubscriberTrait"],"type":["OutputPortSubscriber"]};

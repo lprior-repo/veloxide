@@ -1,0 +1,21 @@
+Checking canonical projection type definitions...
+Canonical projection type definitions verified.
+Checking file lengths in diagram_tool/src (Max 300 lines)...
+ERROR: The following files exceed the 300 line limit:
+
+    334 diagram_tool/src/ui/canvas/node_layer/handlers.rs
+    387 diagram_tool/src/ui/canvas/node_layer/state.rs
+    361 diagram_tool/src/ui/canvas/edge_layer.rs
+    328 diagram_tool/src/ui/commands/selection.rs
+    520 diagram_tool/src/ui/commands/tests_selection.rs
+    389 diagram_tool/src/ui/sidebar/models.rs
+    333 diagram_tool/src/viewport/state.rs
+    319 diagram_tool/src/viewport/transform.rs
+
+AGENT REMEDIATION INSTRUCTIONS:
+1. Do not increase the line limit.
+2. Refactor the file into smaller, focused modules.
+3. Move independent components, models, or logic to separate files.
+4. Follow the Data -> Calc -> Actions pattern to decompose logic.
+Checking for architectural boundary violations...
+No boundary violations found.

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["MessageRetryStrategy"],"struct":["Job","JobBuilder","JobOptions","RetriableMessage"],"trait":["JobKey"]};

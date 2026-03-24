@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["DiscardMode","DiscardReason","DiscardSettings"],"trait":["DiscardHandler","DynamicDiscardController"]};

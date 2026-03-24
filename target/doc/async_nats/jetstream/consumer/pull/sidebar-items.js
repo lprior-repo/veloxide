@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["BatchErrorKind","BatchRequestErrorKind","ConsumerRecreateErrorKind","MessagesErrorKind","OrderedErrorKind"],"struct":["Batch","BatchBuilder","BatchConfig","Config","FetchBuilder","Ordered","OrderedConfig","Sequence","Stream","StreamBuilder"],"type":["BatchError","BatchRequestError","ConsumerRecreateError","MessagesError","OrderedError"]};

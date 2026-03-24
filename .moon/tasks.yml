@@ -1,0 +1,91 @@
+$schema: "https://moonrepo.dev/schemas/tasks.json"
+tasks:
+  serve:
+    script: |
+      dx serve --platform web --port 8081
+    options:
+      cache: false
+
+  check:
+    script: |
+      /usr/bin/cargo check
+
+  test:
+    script: |
+      /usr/bin/cargo test
+
+  clippy:
+    script: |
+      /usr/bin/cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
+
+  fmt:
+    script: |
+      /usr/bin/cargo fmt --check
+
+  build-web:
+    script: |
+      dx build --platform web
+
+  e2e-smoke:
+    command: "npm exec -- playwright test --project e2e-smoke"
+    options:
+      cache: false
+
+  e2e-baseline:
+    command: "npm exec -- playwright test --project baseline"
+    options:
+      cache: false
+
+  e2e-seeded:
+    command: "npm exec -- playwright test --project redqueen-seeded --grep @rq"
+    options:
+      cache: false
+
+  e2e-stress:
+    command: "npm exec -- playwright test --project redqueen-stress"
+    options:
+      cache: false
+
+  e2e:
+    script: |
+      moon run :e2e-baseline
+    options:
+      cache: false
+
+  e2e-hardening:
+    script: |
+      moon run :e2e-seeded
+      moon run :e2e-stress
+    options:
+      cache: false
+
+  coverage:
+    script: |
+      /usr/bin/cargo llvm-cov --summary-only
+
+  coverage-core:
+    script: |
+      /usr/bin/cargo llvm-cov --summary-only --ignore-filename-regex '(src/main.rs|src/bin/|src/ui/|src/hooks/)'
+
+  ci:
+    script: |
+      moon run :check
+      moon run :test
+      moon run :clippy
+      moon run :e2e-baseline
+    options:
+      cache: true
+
+  ci-hardening:
+    script: |
+      moon run :ci
+      moon run :e2e-hardening
+    options:
+      cache: true
+
+  ci-nightly:
+    script: |
+      moon run :ci-hardening
+      moon run :e2e-stress
+    options:
+      cache: false

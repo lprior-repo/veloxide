@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["FlushErrorKind","PublishErrorKind","RequestErrorKind"],"mod":["traits"],"struct":["Client","DrainError","ReconnectError","Request","Statistics","SubscribeError"],"type":["FlushError","PublishError","RequestError"]};

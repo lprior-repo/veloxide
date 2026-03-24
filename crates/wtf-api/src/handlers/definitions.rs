@@ -13,7 +13,10 @@ pub async fn ingest_definition(
     if req.workflow_type.trim().is_empty() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(ApiError::new("invalid_request", "workflow_type must be non-empty")),
+            Json(ApiError::new(
+                "invalid_request",
+                "workflow_type must be non-empty",
+            )),
         )
             .into_response();
     }
@@ -35,7 +38,13 @@ pub async fn ingest_definition(
                 let key = definition_key("default", &req.workflow_type);
                 let value = req.source.as_bytes().to_vec().into();
                 match kv.definitions.put(&key, value).await {
-                    Ok(_) => (StatusCode::OK, Json(DefinitionResponse { valid, diagnostics: dtos }))
+                    Ok(_) => (
+                        StatusCode::OK,
+                        Json(DefinitionResponse {
+                            valid,
+                            diagnostics: dtos,
+                        }),
+                    )
                         .into_response(),
                     Err(e) => (
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -44,7 +53,13 @@ pub async fn ingest_definition(
                         .into_response(),
                 }
             } else {
-                (StatusCode::OK, Json(DefinitionResponse { valid, diagnostics: dtos }))
+                (
+                    StatusCode::OK,
+                    Json(DefinitionResponse {
+                        valid,
+                        diagnostics: dtos,
+                    }),
+                )
                     .into_response()
             }
         }
@@ -70,7 +85,10 @@ mod tests {
 
     #[test]
     fn definition_key_uses_default_namespace() {
-        assert_eq!(definition_key("default", "my-workflow"), "default/my-workflow");
+        assert_eq!(
+            definition_key("default", "my-workflow"),
+            "default/my-workflow"
+        );
     }
 
     #[test]
@@ -120,7 +138,10 @@ mod tests {
                             let valid = dtos.iter().all(|d| d.severity != "error");
                             (
                                 StatusCode::OK,
-                                Json(DefinitionResponse { valid, diagnostics: dtos }),
+                                Json(DefinitionResponse {
+                                    valid,
+                                    diagnostics: dtos,
+                                }),
                             )
                                 .into_response()
                         }
