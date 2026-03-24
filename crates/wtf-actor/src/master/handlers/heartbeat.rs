@@ -3,24 +3,24 @@ use crate::master::state::OrchestratorState;
 use crate::messages::{InstanceSeed, OrchestratorMsg};
 use ractor::{Actor, ActorRef};
 use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
+use tokio::sync::Mutex;
+use std::sync::OnceLock;
 use wtf_common::{InstanceId, InstanceMetadata};
 
-fn acquire_in_flight_guard() -> std::sync::MutexGuard<'static, HashSet<String>> {
+/// Acquire the in-flight guard for recovery deduplication.
+/// Uses tokio::sync::Mutex to avoid blocking the async runtime.
+async fn acquire_in_flight_guard() -> tokio::sync::MutexGuard<'static, HashSet<String>> {
     static IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    let guard = IN_FLIGHT.get_or_init(|| Mutex::new(HashSet::new())).lock();
-    match guard {
-        Ok(g) => g,
-        Err(poisoned) => {
-            tracing::error!("in_flight mutex was poisoned — recovering guard to prevent key leaks");
-            poisoned.into_inner()
-        }
-    }
+    // Tokio mutexes do not poison - the lock() returns MutexGuard directly.
+    IN_FLIGHT
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+        .await
 }
 
 /// Check whether heartbeat-expired recovery should proceed for this instance.
 /// Returns `Some(in_flight_key)` if recovery should proceed, `None` if skipped.
-fn check_recovery_preconditions(
+async fn check_recovery_preconditions(
     state: &OrchestratorState,
     instance_id: &InstanceId,
 ) -> Option<String> {
@@ -30,7 +30,7 @@ fn check_recovery_preconditions(
     }
 
     let in_flight_key = instance_id.to_string();
-    let mut guard = acquire_in_flight_guard();
+    let mut guard = acquire_in_flight_guard().await;
     if !guard.insert(in_flight_key.clone()) {
         tracing::debug!(instance_id = %instance_id, "recovery already in-flight; skipping duplicate trigger");
         return None;
@@ -47,7 +47,7 @@ async fn attempt_recovery(
 ) {
     let Some(metadata) = fetch_metadata(state, instance_id).await else {
         tracing::warn!(instance_id = %instance_id, "instance metadata missing; recovery skipped");
-        acquire_in_flight_guard().remove(in_flight_key);
+        acquire_in_flight_guard().await.remove(in_flight_key);
         return;
     };
 
@@ -62,7 +62,7 @@ async fn attempt_recovery(
     }
 
     // Always clean up the in-flight key, even if spawn failed.
-    acquire_in_flight_guard().remove(in_flight_key);
+    acquire_in_flight_guard().await.remove(in_flight_key);
 }
 
 pub async fn handle_heartbeat_expired(
@@ -70,7 +70,7 @@ pub async fn handle_heartbeat_expired(
     state: &mut OrchestratorState,
     instance_id: InstanceId,
 ) {
-    let Some(in_flight_key) = check_recovery_preconditions(state, &instance_id) else {
+    let Some(in_flight_key) = check_recovery_preconditions(state, &instance_id).await else {
         return;
     };
     attempt_recovery(&myself, state, &instance_id, &in_flight_key).await;
