@@ -22,6 +22,8 @@ pub struct SignalRequest {
 pub struct DefinitionRequest {
     pub source: String,
     pub workflow_type: String,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// POST /api/v1/workflows request body.

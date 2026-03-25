@@ -1,12 +1,13 @@
 use axum::extract::Extension;
 use axum::{extract::Path, http::StatusCode, response::IntoResponse, Json};
+use wtf_common::{WorkflowDefinition, WorkflowParadigm};
 use wtf_storage::kv::{definition_key, KvStores};
 
 use crate::types::{ApiError, DefinitionRequest, DefinitionResponse, DiagnosticDto};
 
 /// POST /api/v1/definitions/:type — ingest, lint, and store a workflow definition.
 pub async fn ingest_definition(
-    Path(_definition_type): Path<String>,
+    Path(definition_type): Path<String>,
     Extension(kv): Extension<KvStores>,
     Json(req): Json<DefinitionRequest>,
 ) -> impl IntoResponse {
@@ -20,6 +21,26 @@ pub async fn ingest_definition(
         )
             .into_response();
     }
+
+    // Map URL path :type to WorkflowParadigm
+    let paradigm = match definition_type.as_str() {
+        "fsm" => WorkflowParadigm::Fsm,
+        "dag" => WorkflowParadigm::Dag,
+        "procedural" => WorkflowParadigm::Procedural,
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiError::new(
+                    "invalid_paradigm",
+                    format!(
+                        "paradigm must be one of 'fsm', 'dag', or 'procedural', got '{}'",
+                        definition_type
+                    ),
+                )),
+            )
+                .into_response();
+        }
+    };
 
     match wtf_linter::lint_workflow_code(&req.source) {
         Ok(diagnostics) => {
@@ -36,8 +57,22 @@ pub async fn ingest_definition(
             let valid = dtos.iter().all(|d| d.severity != "error");
             if valid {
                 let key = definition_key("default", &req.workflow_type);
-                let value = req.source.as_bytes().to_vec().into();
-                match kv.definitions.put(&key, value).await {
+                let definition = WorkflowDefinition {
+                    paradigm,
+                    graph_raw: req.source,
+                    description: req.description,
+                };
+                let value = match serde_json::to_vec(&definition) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(ApiError::new("serialization_error", e.to_string())),
+                        )
+                            .into_response();
+                    }
+                };
+                match kv.definitions.put(&key, value.into()).await {
                     Ok(_) => (
                         StatusCode::OK,
                         Json(DefinitionResponse {
@@ -96,6 +131,7 @@ mod tests {
         let req = DefinitionRequest {
             source: "fn main() {}".to_owned(),
             workflow_type: "test-proc".to_owned(),
+            description: None,
         };
         assert_eq!(
             definition_key("default", &req.workflow_type),
