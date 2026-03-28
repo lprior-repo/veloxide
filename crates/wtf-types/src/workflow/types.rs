@@ -70,7 +70,7 @@ impl RetryPolicy {
         if max_attempts == 0 {
             return Err(RetryPolicyError::ZeroAttempts);
         }
-        if backoff_multiplier < 1.0 {
+        if backoff_multiplier < 1.0 || backoff_multiplier.is_nan() {
             return Err(RetryPolicyError::InvalidMultiplier {
                 got: backoff_multiplier,
             });

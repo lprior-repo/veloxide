@@ -75,7 +75,7 @@ fn step_outcome_has_exactly_two_variants_when_checked() {
 #[test]
 fn step_outcome_serde_round_trips_for_both_variants() -> Result<(), Box<dyn std::error::Error>> {
     for variant in [StepOutcome::Success, StepOutcome::Failure] {
-        let json = serde_json::to_value(&variant)?;
+        let json = serde_json::to_value(variant)?;
         let restored: StepOutcome = serde_json::from_value(json)?;
         assert_eq!(restored, variant);
     }
@@ -113,7 +113,7 @@ fn edge_condition_serde_round_trips_for_all_variants() -> Result<(), Box<dyn std
         EdgeCondition::OnSuccess,
         EdgeCondition::OnFailure,
     ] {
-        let json = serde_json::to_value(&variant)?;
+        let json = serde_json::to_value(variant)?;
         let restored: EdgeCondition = serde_json::from_value(json)?;
         assert_eq!(restored, variant);
     }
@@ -232,7 +232,7 @@ fn retry_policy_serde_round_trips_for_valid_policy() -> Result<(), Box<dyn std::
         backoff_ms: 2000,
         backoff_multiplier: 1.5,
     };
-    let json = serde_json::to_value(&policy)?;
+    let json = serde_json::to_value(policy)?;
     let restored: RetryPolicy = serde_json::from_value(json)?;
     assert_eq!(restored, policy);
     Ok(())
@@ -1059,7 +1059,7 @@ mod proptests {
                 backoff_ms,
                 backoff_multiplier,
             };
-            let json = serde_json::to_value(&policy).expect("serialize");
+            let json = serde_json::to_value(policy).expect("serialize");
             let restored: RetryPolicy = serde_json::from_value(json).expect("deserialize");
             prop_assert_eq!(restored, policy);
         }

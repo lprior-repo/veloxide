@@ -196,7 +196,6 @@ mod tests {
     // Proptest: NonEmptyVec serde round-trip
     mod proptests {
         use super::*;
-        use proptest::prelude::*;
 
         proptest! {
             /// Invariant: For any NonEmptyVec<Vec<u8>> with 1..=100 elements,

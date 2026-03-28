@@ -18,7 +18,7 @@ updated_at: 2026-03-27T13:45:00Z
 
 - **`new(items: Vec<T>)`**: Returns `Err("NonEmptyVec must not be empty")` when empty, `Ok(NonEmptyVec(items))` otherwise. Zero-branch pure validation.
 - **`new_unchecked(items: Vec<T>)`**: Uses `assert!` to guard the invariant. Intended for internal use where non-emptiness is guaranteed by construction.
-- **`first(&self) -> &T`**: Returns `self.0.first()` with `expect` (invariant-protected; `#[allow(clippy::expect_used)]`).
+- **`first(&self) -> &T`**: Returns `self.0.get_unchecked(0)` with a SAFETY comment (invariant guarantees non-empty).
 - **`rest(&self) -> &[T]`**: Returns `&self.0[1..]`.
 - **`as_slice(&self) -> &[T]`**: Returns `&self.0`.
 - **`into_vec(self) -> Vec<T>`**: Returns `self.0`.

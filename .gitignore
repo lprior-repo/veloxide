@@ -15,6 +15,9 @@
 .beads/metadata.json
 .beads/.beads-credential-key
 
+# Beads pipeline artifacts (contract, test-plan, qa-report, etc.)
+.beads/*/
+
 # Rust
 /target
 Cargo.lock

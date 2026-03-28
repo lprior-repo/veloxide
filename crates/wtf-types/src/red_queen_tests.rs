@@ -69,20 +69,14 @@ fn edge_condition_strategy() -> impl Strategy<Value = EdgeCondition> {
 // NaN/INFINITY through RetryPolicy::new(), direct construction bypass
 // ===========================================================================
 
-// RQ-01: NaN multiplier passes through RetryPolicy::new()
-// NaN < 1.0 is FALSE in IEEE 754, so NaN passes the < 1.0 check.
-// Per NG-10 this is "by design" but violates PO-14 (backoff_multiplier >= 1.0).
+// RQ-01: NaN multiplier is rejected by RetryPolicy::new()
+// NaN < 1.0 is FALSE in IEEE 754, but we explicitly check is_nan().
 #[test]
-fn rq_nan_multiplier_passes_through_retry_policy_new() {
+fn rq_nan_multiplier_rejected_by_retry_policy_new() {
     let result = RetryPolicy::new(1, 0, f32::NAN);
-    assert!(result.is_ok(), "NaN passes because NaN < 1.0 is false");
-    let policy = result.unwrap();
-    assert!(policy.backoff_multiplier.is_nan());
-    // PO-14 violation: NaN >= 1.0 is also false
-    assert!(
-        !(policy.backoff_multiplier >= 1.0),
-        "NaN >= 1.0 is false -- PO-14 is violated"
-    );
+    assert!(result.is_err(), "NaN must be rejected");
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("backoff_multiplier"));
 }
 
 // RQ-02: INFINITY multiplier passes through RetryPolicy::new()
@@ -863,7 +857,7 @@ fn rq_retry_policy_serde_round_trip_1_0_multiplier() {
         backoff_ms: 0,
         backoff_multiplier: 1.0,
     };
-    let json = serde_json::to_value(&policy).unwrap();
+    let json = serde_json::to_value(policy).unwrap();
     let restored: RetryPolicy = serde_json::from_value(json).unwrap();
     assert_eq!(restored, policy);
 }
@@ -891,7 +885,7 @@ fn rq_edge_serde_round_trip_all_conditions() {
 #[test]
 fn rq_step_outcome_serde_round_trip() {
     for outcome in [StepOutcome::Success, StepOutcome::Failure] {
-        let json = serde_json::to_value(&outcome).unwrap();
+        let json = serde_json::to_value(outcome).unwrap();
         let restored: StepOutcome = serde_json::from_value(json).unwrap();
         assert_eq!(restored, outcome);
     }
@@ -1074,21 +1068,24 @@ fn rq_dag_node_is_clone_not_copy() {
     };
     require_clone(node.clone());
     // DagNode should NOT be Copy (NodeName wraps String)
-    fn assert_not_copy<T>(_v: T)
-    where
-        T: Copy,
-    {
-    }
-    // This should fail to compile if DagNode: Copy
     // (We can't test negative trait bounds at runtime, but this is documented)
 }
 
-// RQ-61: RetryPolicy PartialEq works with NaN
-// NaN != NaN in IEEE 754, so two NaN RetryPolicies are NOT equal
+// RQ-61: RetryPolicy PartialEq works with NaN via direct construction
+// NaN != NaN in IEEE 754, so two NaN RetryPolicies are NOT equal.
+// Note: RetryPolicy::new() rejects NaN, but pub fields allow direct construction.
 #[test]
 fn rq_retry_policy_partial_eq_with_nan() {
-    let p1 = RetryPolicy::new(1, 0, f32::NAN).unwrap();
-    let p2 = RetryPolicy::new(1, 0, f32::NAN).unwrap();
+    let p1 = RetryPolicy {
+        max_attempts: 1,
+        backoff_ms: 0,
+        backoff_multiplier: f32::NAN,
+    };
+    let p2 = RetryPolicy {
+        max_attempts: 1,
+        backoff_ms: 0,
+        backoff_multiplier: f32::NAN,
+    };
     // f32 PartialEq: NaN != NaN
     assert_ne!(
         p1, p2,
@@ -1179,7 +1176,7 @@ mod proptests {
                 backoff_ms,
                 backoff_multiplier: multiplier,
             };
-            let json = serde_json::to_value(&policy).unwrap();
+            let json = serde_json::to_value(policy).unwrap();
             let restored: RetryPolicy = serde_json::from_value(json).unwrap();
             prop_assert_eq!(restored, policy);
         }
