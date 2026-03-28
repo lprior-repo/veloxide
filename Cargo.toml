@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/wtf-types",
+    "crates/wtf-engine",
 ]
 
 [workspace.package]
@@ -66,6 +67,12 @@ dioxus-router = "0.7"
 # Error handling
 nom = "7"
 strum = { version = "0.24", features = ["derive"] }
+
+# Concurrent collections
+dashmap = "6"
+
+# Cryptography
+sha2 = "0.10"
 
 # Testing
 rstest = "0.18"
