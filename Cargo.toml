@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "crates/wtf-types",
-    "crates/wtf-engine",
+    "crates/wtf-storage",
 ]
 
 [workspace.package]
@@ -41,6 +41,8 @@ clap = { version = "4", features = ["derive"] }
 # Utilities
 uuid = { version = "1", features = ["v4", "serde"] }
 ulid = "1"
+fjall = "2.0"
+wtf-types = { path = "crates/wtf-types" }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
 anyhow = "1"
