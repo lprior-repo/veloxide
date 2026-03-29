@@ -74,7 +74,7 @@ fn edge_condition_strategy() -> impl Strategy<Value = EdgeCondition> {
 #[test]
 fn rq_nan_multiplier_rejected_by_retry_policy_new() {
     let result = RetryPolicy::new(1, 0, f32::NAN);
-    assert!(matches!(result, Err(_)), "NaN must be rejected");
+    assert!(result.is_err(), "NaN must be rejected");
     let err = result.unwrap_err();
     assert!(err.to_string().contains("backoff_multiplier"));
 }
@@ -94,7 +94,7 @@ fn rq_infinity_multiplier_passes_through_retry_policy_new() {
 #[test]
 fn rq_neg_infinity_multiplier_rejected() {
     let result = RetryPolicy::new(1, 0, f32::NEG_INFINITY);
-    assert!(matches!(result, Err(_)));
+    assert!(result.is_err());
     assert!(matches!(
         result,
         Err(RetryPolicyError::InvalidMultiplier { .. })
@@ -107,7 +107,7 @@ fn rq_nan_multiplier_in_json_rejected_by_serde() {
     let json = r#"{"max_attempts": 1, "backoff_ms": 0, "backoff_multiplier": NaN}"#;
     let result: Result<RetryPolicy, _> = serde_json::from_str(json);
     assert!(
-        matches!(result, Err(_)),
+        result.is_err(),
         "serde_json must reject NaN in JSON by default"
     );
 }
@@ -118,7 +118,7 @@ fn rq_infinity_multiplier_in_json_rejected_by_serde() {
     let json = r#"{"max_attempts": 1, "backoff_ms": 0, "backoff_multiplier": Infinity}"#;
     let result: Result<RetryPolicy, _> = serde_json::from_str(json);
     assert!(
-        matches!(result, Err(_)),
+        result.is_err(),
         "serde_json must reject INFINITY in JSON by default"
     );
 }
@@ -129,7 +129,7 @@ fn rq_neg_infinity_multiplier_in_json_rejected_by_serde() {
     let json = r#"{"max_attempts": 1, "backoff_ms": 0, "backoff_multiplier": -Infinity}"#;
     let result: Result<RetryPolicy, _> = serde_json::from_str(json);
     assert!(
-        matches!(result, Err(_)),
+        result.is_err(),
         "serde_json must reject -INFINITY in JSON by default"
     );
 }
@@ -769,14 +769,14 @@ fn rq_backoff_ms_u64_max_accepted() {
 fn rq_negative_zero_multiplier_rejected() {
     let result = RetryPolicy::new(1, 0, -0.0f32);
     // -0.0 == 0.0, and 0.0 < 1.0 is true, so -0.0 < 1.0 is true → rejected
-    assert!(matches!(result, Err(_)));
+    assert!(result.is_err());
 }
 
 // RQ-39: Very small positive multiplier just below 1.0 is rejected
 #[test]
 fn rq_very_small_positive_multiplier_rejected() {
     let result = RetryPolicy::new(1, 0, 0.9999999f32);
-    assert!(matches!(result, Err(_)));
+    assert!(result.is_err());
 }
 
 // RQ-40: Very large multiplier is accepted
@@ -1103,7 +1103,7 @@ mod proptests {
             multiplier in -1e38f32..0.9999f32,
         ) {
             let result = RetryPolicy::new(max_attempts, backoff_ms, multiplier);
-            prop_assert!(matches!(result, Err(_)), "multiplier {} should be rejected", multiplier);
+            prop_assert!(result.is_err(), "multiplier {} should be rejected", multiplier);
         }
 
         // RQ-PROP-02: RetryPolicy::new accepts all multipliers >= 1.0

@@ -1,9 +1,15 @@
 projects:
   root: "."
   crates/vo-types: "crates/vo-types"
+  crates/vo-storage: "crates/vo-storage"
   crates/vo-api: "crates/vo-api"
   crates/vo-cli: "crates/vo-cli"
   crates/vo-worker: "crates/vo-worker"
+  crates/vo-frontend: "crates/vo-frontend"
+  crates/vo-linter: "crates/vo-linter"
+  crates/vo-actor: "crates/vo-actor"
+  crates/vo-core: "crates/vo-core"
+  crates/vo-common: "crates/vo-common"
 
 vcs:
   client: git

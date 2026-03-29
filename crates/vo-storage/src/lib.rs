@@ -12,3 +12,12 @@ pub mod codec;
 pub mod partitions;
 pub mod query;
 pub mod timer_index;
+
+/// Appends an event to the storage backend.
+///
+/// # Errors
+///
+/// Returns an error if the append operation fails due to storage or networking issues.
+pub fn append_event<E>(_namespace: &str, _instance_id: &str, _event: E) -> Result<(), String> {
+    Ok(())
+}

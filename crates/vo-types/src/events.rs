@@ -66,6 +66,7 @@ impl EventEnvelope {
         Self::from_str(json_str)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &str) -> Result<Self, Error> {
         let value: serde_json::Value =
             serde_json::from_str(input).map_err(|_| Error::InvalidEnvelopeFormat)?;
