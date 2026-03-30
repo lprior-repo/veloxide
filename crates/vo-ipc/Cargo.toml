@@ -1,0 +1,15 @@
+[package]
+name = "vo-ipc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde_json.workspace = true
+vo-types = { path = "../vo-types" }
+
+[dev-dependencies]
+rstest.workspace = true
+proptest.workspace = true
+toml = "0.8"

@@ -10,6 +10,7 @@ projects:
   crates/vo-actor: "crates/vo-actor"
   crates/vo-core: "crates/vo-core"
   crates/vo-common: "crates/vo-common"
+  crates/vo-ipc: "crates/vo-ipc"
 
 vcs:
   client: git
