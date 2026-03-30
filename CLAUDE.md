@@ -66,6 +66,13 @@ bd update <id> --claim  # Claim work
 bd close <id>         # Complete work
 ```
 
+### Dolt Remote
+
+The beads Dolt database syncs to DoltHub:
+- **Remote:** `doltremoteapi.dolthub.com/priorlewis43/wtf-engine-database`
+- **Web:** https://www.dolthub.com/repositories/priorlewis43/wtf-engine-database
+- **Config:** `sync.git-remote` in `.beads/config.yaml`
+
 ### Rules
 
 - Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists

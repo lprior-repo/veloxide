@@ -12,6 +12,13 @@ bd close <id>         # Complete work
 bd dolt push          # Push beads data to remote
 ```
 
+## Dolt Remote
+
+The beads Dolt database syncs to DoltHub:
+- **Remote:** `doltremoteapi.dolthub.com/priorlewis43/wtf-engine-database`
+- **Web:** https://www.dolthub.com/repositories/priorlewis43/wtf-engine-database
+- **Config:** `sync.git-remote` in `.beads/config.yaml`
+
 ## Dolt Troubleshooting
 
 If you encounter `dolt` server unreachable, corruption, or missing database issues during `bd` execution, use the following recovery pipeline to forcefully clean the environment and restore your local tracker context:
@@ -25,6 +32,7 @@ dolt init
 dolt sql -q "CREATE DATABASE wtf;"
 cd ../..
 bd dolt start
+bd dolt remote add origin https://doltremoteapi.dolthub.com/priorlewis43/wtf-engine-database
 bd backup restore
 ```
 
