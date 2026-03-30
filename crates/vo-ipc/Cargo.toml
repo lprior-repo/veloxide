@@ -7,9 +7,15 @@ license.workspace = true
 [dependencies]
 tokio.workspace = true
 serde_json.workspace = true
-vo-types = { path = "../vo-types" }
+thiserror.workspace = true
+libc = "0.2"
 
 [dev-dependencies]
 rstest.workspace = true
 proptest.workspace = true
 toml = "0.8"
+tempfile.workspace = true
+
+[[bin]]
+name = "fixture_driver"
+path = "tests/fixtures/src/bin/fixture_driver.rs"

@@ -2928,12 +2928,14 @@ version = "0.1.0"
 name = "vo-ipc"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "proptest",
  "rstest",
  "serde_json",
+ "tempfile",
+ "thiserror",
  "tokio",
  "toml",
- "vo-types",
 ]
 
 [[package]]
