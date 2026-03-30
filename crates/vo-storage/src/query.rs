@@ -9,12 +9,23 @@ use vo_types::{EventEnvelope, EventError, InstanceId};
 // Data layer — error enum
 // ---------------------------------------------------------------------------
 
+/// Storage-layer replay errors.
+///
+/// This enum is intentionally `#[non_exhaustive]` because storage-facing
+/// replay can gain more precise failure modes over time without breaking
+/// downstream callers.
+#[non_exhaustive]
 #[derive(Debug, PartialEq, Eq)]
 pub enum StorageError {
+    /// Encountered a non-consecutive sequence number during replay.
     SequenceGap,
+    /// The stored envelope bytes could not be decoded into a valid envelope.
     CorruptEventPayload,
+    /// The envelope version is syntactically valid but unsupported.
     UnsupportedVersion,
+    /// A lower-level storage boundary failed (bad key width, partition read, etc.).
     Storage,
+    /// Caller supplied an invalid argument or a decoded value violated invariants.
     InvalidArgument,
 }
 
@@ -39,12 +50,13 @@ pub const fn encode_key(sequence: u64) -> Result<[u8; 8], StorageError> {
 ///
 /// # Errors
 ///
-/// Returns `StorageError::Storage` if the slice is not exactly 8 bytes or decodes to zero.
+/// Returns `StorageError::Storage` if the slice is not exactly 8 bytes.
+/// Returns `StorageError::InvalidArgument` if the slice decodes to zero.
 pub fn decode_key(bytes: &[u8]) -> Result<u64, StorageError> {
     let arr: [u8; 8] = bytes.try_into().map_err(|_| StorageError::Storage)?;
     let seq = u64::from_be_bytes(arr);
     if seq == 0 {
-        return Err(StorageError::Storage);
+        return Err(StorageError::InvalidArgument);
     }
     Ok(seq)
 }
@@ -53,11 +65,11 @@ pub fn decode_key(bytes: &[u8]) -> Result<u64, StorageError> {
 ///
 /// # Errors
 ///
-/// Returns `StorageError::Storage` if the instance ID exceeds 255 bytes.
+/// Returns `StorageError::InvalidArgument` if the instance ID exceeds 255 bytes.
 /// Returns `StorageError::InvalidArgument` if the instance ID contains null bytes.
 pub fn prefix_generator(instance_id: &str) -> Result<Vec<u8>, StorageError> {
     if instance_id.len() > 255 {
-        return Err(StorageError::Storage);
+        return Err(StorageError::InvalidArgument);
     }
     if instance_id.as_bytes().contains(&b'\0') {
         return Err(StorageError::InvalidArgument);
@@ -65,7 +77,22 @@ pub fn prefix_generator(instance_id: &str) -> Result<Vec<u8>, StorageError> {
     Ok(instance_id.as_bytes().to_vec())
 }
 
-/// Map a decode-layer error into the appropriate `StorageError` variant.
+/// Map an envelope decode error into the storage-layer replay taxonomy.
+///
+/// ## Why this intentionally collapses errors
+///
+/// `replay_events` is a storage-boundary API. Its responsibility is to:
+/// - read bytes from storage,
+/// - recover an `EventEnvelope`, and
+/// - stop replay when storage ordering or envelope validity is violated.
+///
+/// At this layer we intentionally do **not** preserve every fine-grained
+/// `EventError` variant. For replay callers, the actionable distinction is:
+/// - `UnsupportedVersion`: the envelope is well-formed but from an unsupported version.
+/// - `CorruptEventPayload`: the stored envelope bytes are malformed or incomplete.
+///
+/// This keeps the replay API stable while still distinguishing the only versioning
+/// concern that callers can reasonably react to differently.
 #[must_use]
 pub const fn error_mapper(error: &EventError) -> StorageError {
     match error {
@@ -295,7 +322,7 @@ mod tests {
 
     #[test]
     fn decode_key_returns_error_for_zero_sequence() {
-        assert_eq!(decode_key(&[0u8; 8]), Err(StorageError::Storage));
+        assert_eq!(decode_key(&[0u8; 8]), Err(StorageError::InvalidArgument));
     }
 
     #[test]
@@ -329,13 +356,16 @@ mod tests {
     #[test]
     fn prefix_generator_returns_error_for_overly_long_instance_id() {
         let long_id = "a".repeat(256);
-        assert_eq!(prefix_generator(&long_id), Err(StorageError::Storage));
+        assert_eq!(
+            prefix_generator(&long_id),
+            Err(StorageError::InvalidArgument)
+        );
     }
 
     #[test]
     fn prefix_generator_accepts_max_length_instance_id() {
         let max_id = "a".repeat(255);
-        assert!(prefix_generator(&max_id).is_ok());
+        assert_eq!(prefix_generator(&max_id), Ok(max_id.into_bytes()));
     }
 
     // ---- error_mapper tests ----
@@ -365,8 +395,7 @@ mod tests {
         let mut state = IteratorState::new();
         let env = make_envelope(1);
         let result = state.advance(5, env);
-        assert!(result.is_some());
-        assert!(result.unwrap().is_ok());
+        assert_eq!(result, Some(Ok(make_envelope(1))));
     }
 
     #[test]
@@ -381,7 +410,8 @@ mod tests {
     fn iterator_state_detects_sequence_gap() {
         let mut state = IteratorState::new();
         let env1 = make_envelope(1);
-        let _ = state.advance(1, env1);
+        let first = state.advance(1, env1);
+        assert_eq!(first, Some(Ok(make_envelope(1))));
         let env2 = make_envelope(3);
         let result = state.advance(3, env2);
         assert_eq!(result, Some(Err(StorageError::SequenceGap)));
@@ -392,10 +422,10 @@ mod tests {
         let mut state = IteratorState::new();
         let env1 = make_envelope(1);
         let r1 = state.advance(1, env1);
-        assert!(r1.unwrap().is_ok());
+        assert_eq!(r1, Some(Ok(make_envelope(1))));
         let env2 = make_envelope(2);
         let r2 = state.advance(2, env2);
-        assert!(r2.unwrap().is_ok());
+        assert_eq!(r2, Some(Ok(make_envelope(2))));
     }
 
     #[test]
@@ -403,7 +433,7 @@ mod tests {
         let mut state = IteratorState::new();
         let env = make_envelope(u64::MAX);
         let r1 = state.advance(u64::MAX, env);
-        assert!(r1.unwrap().is_ok());
+        assert_eq!(r1, Some(Ok(make_envelope(u64::MAX))));
         // expected is now None (overflow)
         let env2 = make_envelope(1);
         let r2 = state.advance(1, env2);
@@ -432,12 +462,13 @@ mod tests {
 
         #[test]
         fn proptest_prefix_generator_never_panics(s in "\\PC{0,255}") {
-            let _ = prefix_generator(&s);
+            let result = prefix_generator(&s);
+            prop_assert!(matches!(result, Ok(_) | Err(StorageError::InvalidArgument)));
         }
 
         #[test]
         fn proptest_encode_key_never_returns_none_for_nonzero(seq in 1u64..) {
-            prop_assert!(encode_key(seq).is_ok());
+            prop_assert_eq!(encode_key(seq), Ok(seq.to_be_bytes()));
         }
     }
 }
